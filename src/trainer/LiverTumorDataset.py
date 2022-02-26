@@ -1,3 +1,20 @@
+"""
+    :filename LiverTumorDataset.py
+
+    :brief Dataset class for segmentation of liver and tumor from CT scans of abdomen.
+
+    :author Tibor Kubik
+    :author Ladislav Ondris
+    :author Alexander Polok
+
+    :email xkubik34@stud.fit.vutbr.cz
+    :email xondri07@stud.fit.vutbr.cz
+    :email xpolok03@stud.fit.vutbr.cz
+
+    This file was created as a part of project called 'Visual Transformers for Liver and Liver Tumor Segmentation from
+    CT Scans of Human Abdomens' for KNN/2021L course.
+"""
+
 import os
 import cv2
 import glob
