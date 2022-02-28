@@ -237,9 +237,6 @@ class UNet(nn.Module):
 
 if __name__ == '__main__':
     network = UNet(in_channels=1, out_channels=1).to('cuda:0')
-    from src.utils.utils_general import count_parameters
-
-    count_parameters(network)
 
     input_tensor = torch.rand(1, 1, 512, 512).to('cuda:0')
 
