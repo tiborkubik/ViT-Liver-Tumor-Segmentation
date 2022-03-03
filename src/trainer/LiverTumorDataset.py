@@ -19,6 +19,7 @@ import os
 import cv2
 import glob
 import torch
+import config
 import logging
 import matplotlib
 import numpy as np
@@ -59,11 +60,14 @@ class LiverTumorDataset(Dataset):
     def __getitem__(self, item):
 
         slice = cv2.imread(self.slices[item][0], cv2.IMREAD_GRAYSCALE)
+        slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']), interpolation=cv2.INTER_AREA)
+
         mask = cv2.imread(self.slices[item][1], cv2.IMREAD_GRAYSCALE)
+        mask = cv2.resize(mask, (config.DIMENSIONS['output_net'], config.DIMENSIONS['output_net']), interpolation=cv2.INTER_AREA)
 
         sample = {
-            'image': slice,
-            'mask': mask
+            'images': slice,
+            'masks': mask
         }
 
         if self.transforms is not None:
@@ -84,7 +88,7 @@ class LiverTumorDataset(Dataset):
         return len(self.slices)
 
 
-def get_dataset_loaders(dataset_dir, transforms=None, batch_size=32, workers=1,
+def get_dataset_loaders(dataset_dir, transforms=None, batch_size=32, workers=0,
                         validation_split=.2, random=True, ddp=False):
     """
     Method prepares torch dataset loaders for the training.
