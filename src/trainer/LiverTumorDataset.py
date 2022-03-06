@@ -31,6 +31,7 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import Dataset, Subset, random_split, DataLoader
 
 from src.trainer.transforms import ElasticTransform, Invert
+from src.documentation.plots import augmentation_diff
 
 matplotlib.rcParams["figure.dpi"] = 400
 
@@ -70,7 +71,8 @@ class LiverTumorDataset(Dataset):
 
         sample = {
             'images': slice,
-            'masks': mask
+            'masks_liver': (mask == 1.0).astype(float),
+            'masks_tumor': (mask == 2.0).astype(float),
         }
 
         seed = np.random.randint(0, 2 ** 32)
@@ -80,7 +82,6 @@ class LiverTumorDataset(Dataset):
                 np.random.seed(seed)
                 torch.manual_seed(seed)
                 sample[key] = self.transforms(sample[key])
-
         # Debugging purposes
         # assert torch.all(sample['images'] == sample['masks'])
 
@@ -91,6 +92,10 @@ class LiverTumorDataset(Dataset):
         for key in sample:
             assert sample[key] is not None, \
                 f'Invalid {key} in sample {self.slices[item]}'
+
+        sample['masks'] = torch.concat([sample['masks_liver'],sample['masks_tumor']])
+        del sample['masks_liver']
+        del sample['masks_tumor']
 
         return sample
 
@@ -240,7 +245,6 @@ if __name__ == '__main__':
     train_loader, val_loader = get_dataset_loaders('data/train-val/', batch_size=test_batch_size, transforms=transforms)
 
     sample = next(iter(train_loader))
-    x = 2
     #
     # f, axarr = plt.subplots(2, test_batch_size)
     # f.set_size_inches(10, 3)
