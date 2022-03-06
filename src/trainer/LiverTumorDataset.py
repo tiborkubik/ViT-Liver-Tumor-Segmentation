@@ -24,12 +24,13 @@ import logging
 import matplotlib
 import numpy as np
 import nibabel as nib
-import matplotlib.pyplot as plt
+import random
 
-from tqdm import tqdm
-from torchvision import transforms
+from torchvision import transforms as T
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import Dataset, Subset, random_split, DataLoader
+
+from src.trainer.transforms import ElasticTransform, Invert
 
 matplotlib.rcParams["figure.dpi"] = 400
 
@@ -60,22 +61,32 @@ class LiverTumorDataset(Dataset):
     def __getitem__(self, item):
 
         slice = cv2.imread(self.slices[item][0], cv2.IMREAD_GRAYSCALE)
-        slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']), interpolation=cv2.INTER_AREA)
+        slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
+                           interpolation=cv2.INTER_AREA)
 
         mask = cv2.imread(self.slices[item][1], cv2.IMREAD_GRAYSCALE)
-        mask = cv2.resize(mask, (config.DIMENSIONS['output_net'], config.DIMENSIONS['output_net']), interpolation=cv2.INTER_AREA)
+        mask = cv2.resize(mask, (config.DIMENSIONS['output_net'], config.DIMENSIONS['output_net']),
+                          interpolation=cv2.INTER_AREA)
 
         sample = {
             'images': slice,
             'masks': mask
         }
 
+        seed = np.random.randint(0, 2 ** 32)
         if self.transforms is not None:
             for key in sample:
-                sample[key] = transforms.ToTensor()(sample[key])
+                random.seed(seed)
+                np.random.seed(seed)
+                torch.manual_seed(seed)
+                sample[key] = self.transforms(sample[key])
 
-            # TODO: apply custom transformations from self.transforms (specified by argument).
-            # sample = self.transforms(sample)
+        # Debugging purposes
+        # assert torch.all(sample['images'] == sample['masks'])
+
+        # Visualisation purposes
+        # augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks'].numpy().squeeze(),
+        #                   'documentation/augmentation_sample')
 
         for key in sample:
             assert sample[key] is not None, \
@@ -150,6 +161,19 @@ def get_dataset_loaders(dataset_dir, transforms=None, batch_size=32, workers=0,
     return train_loader, val_loader
 
 
+def normalize_slice(ct_slice, window=(1500, -600)):
+    """
+    Normalize CT slice, by windowing over predefined levels. Default window param corresponds to liver window form from
+    https://docs.fast.ai/medical.imaging.
+    """
+    px = ct_slice.copy()
+    w_width, w_level = window
+    px_min, px_max = w_level - w_width // 2, w_level + w_width // 2
+    px[px < px_min] = px_min
+    px[px > px_max] = px_max
+    return (px - px_min) / (px_max - px_min)
+
+
 def pre_process_niis(path):
     """
     Use this to extract slices and corresponding masks from .nii volumes as png images and store them on disk.
@@ -158,7 +182,14 @@ def pre_process_niis(path):
 
     :return: void
     """
-    w_path = path + 'vols-3d/'
+    w_path = os.path.join(path, 'vols-3d')
+    vol_slices_path = os.path.join(path, 'vols-2d')
+    segs_slices_path = os.path.join(path, 'segs-2d')
+
+    if not os.path.exists(vol_slices_path):
+        os.makedirs(vol_slices_path)
+    if not os.path.exists(segs_slices_path):
+        os.makedirs(segs_slices_path)
 
     # Paths of .nii volumes.
     all_nii_files = [file
@@ -173,7 +204,7 @@ def pre_process_niis(path):
         vol_name = nii_file.split(".")[-2].split('/')[-1]
 
         for i in range(num_slices):
-            cv2.imwrite(path + f'vols-2d/{vol_name}-{i}.png', vol[:, :, i])
+            cv2.imwrite(os.path.join(path, f'vols-2d/{vol_name}-{i}.png'), normalize_slice(vol[:, :, i]))
 
         seg_nii_path = nii_file.replace('volume', 'segmentation').replace('vols', 'segs')
         seg = nib.load(seg_nii_path)
@@ -181,19 +212,35 @@ def pre_process_niis(path):
 
         seg_name = seg_nii_path.split(".")[-2].split('/')[-1]
 
+        """ Uncomment this to plot slice, mask and normalized slice sample"""
+        # if nii_file == 'data/train-val/vols-3d/volume-2.nii':
+        #     sample_id = 450
+        #     plot_slice_sample(vol[..., sample_id], normalize_slice(vol[..., sample_id].astype(np.float32)), seg[..., sample_id], savefig='documentation/slice_sample')
         for i in range(num_slices):
-            cv2.imwrite(path + f'segs-2d/{seg_name}-{i}.png', seg[:, :, i])
+            cv2.imwrite(os.path.join(path, f'segs-2d/{seg_name}-{i}.png'), seg[:, :, i])
 
 
 if __name__ == '__main__':
-    ''' Uncomment this to extract the individual slices and masks as png images (from nii volumes). '''
-    # pre_process_niis('../../data/train-val/')
+    """ Uncomment this to extract the individual slices and masks as png images (from nii volumes). """
+    # pre_process_niis('data/train-val/')
 
-    ''' So this method is basically ready-to-use in training pipeline. Here, it's just for testing. '''
+    """ So this method is basically ready-to-use in training pipeline. Here, it's just for testing. """
     test_batch_size = 8
-    train_loader, val_loader = get_dataset_loaders('../../data/train-val/', batch_size=test_batch_size)
+    displacement_val = np.random.randn(2, 3, 3) * 5.84
+    transforms = T.Compose([
+        T.RandomApply([ElasticTransform(displacement=displacement_val)], p=0.85),
+        T.ToTensor(),
+        T.RandomApply([T.RandomAdjustSharpness(sharpness_factor=5.39)], p=0.44),
+        T.RandomApply([Invert()], p=0.5),
+        T.RandomApply([T.RandomRotation(degrees=3.09)], p=0.59),
+        T.RandomApply([T.RandomAffine(degrees=0, shear=3.68)], p=0.62),
+        T.RandomApply([T.ColorJitter(brightness=0.959)], p=0.71),
+    ])
+
+    train_loader, val_loader = get_dataset_loaders('data/train-val/', batch_size=test_batch_size, transforms=transforms)
 
     sample = next(iter(train_loader))
+    x = 2
     #
     # f, axarr = plt.subplots(2, test_batch_size)
     # f.set_size_inches(10, 3)
@@ -203,4 +250,3 @@ if __name__ == '__main__':
     #
     # plt.tight_layout()
     # plt.show()
-
