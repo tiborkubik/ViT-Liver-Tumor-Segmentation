@@ -30,7 +30,7 @@ from torchvision import transforms as T
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import Dataset, Subset, random_split, DataLoader
 
-from src.trainer.transforms import ElasticTransform, Invert
+from src.trainer.transforms import RandomElastic, Invert
 from src.documentation.plots import augmentation_diff
 
 matplotlib.rcParams["figure.dpi"] = 400
@@ -86,8 +86,7 @@ class LiverTumorDataset(Dataset):
         # assert torch.all(sample['images'] == sample['masks'])
 
         # Visualisation purposes
-        # augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks'].numpy().squeeze(),
-        #                   'documentation/augmentation_sample')
+        augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks_liver'].numpy().squeeze())
 
         for key in sample:
             assert sample[key] is not None, \
@@ -233,13 +232,13 @@ if __name__ == '__main__':
     test_batch_size = 8
     displacement_val = np.random.randn(2, 3, 3) * 5.84
     transforms = T.Compose([
-        T.RandomApply([ElasticTransform(displacement=displacement_val)], p=0.85),
+        T.RandomApply([RandomElastic(alpha=2, sigma=0.06)], p=0.85),
         T.ToTensor(),
         T.RandomApply([T.RandomAdjustSharpness(sharpness_factor=5.39)], p=0.44),
-        T.RandomApply([Invert()], p=0.5),
         T.RandomApply([T.RandomRotation(degrees=3.09)], p=0.59),
         T.RandomApply([T.RandomAffine(degrees=0, shear=3.68)], p=0.62),
         T.RandomApply([T.ColorJitter(brightness=0.959)], p=0.71),
+        T.RandomApply([Invert()], p=0.5)
     ])
 
     train_loader, val_loader = get_dataset_loaders('data/train-val/', batch_size=test_batch_size, transforms=transforms)
