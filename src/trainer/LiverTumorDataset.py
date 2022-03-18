@@ -86,7 +86,7 @@ class LiverTumorDataset(Dataset):
         # assert torch.all(sample['images'] == sample['masks'])
 
         # Visualisation purposes
-        augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks_liver'].numpy().squeeze())
+        # augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks_liver'].numpy().squeeze())
 
         for key in sample:
             assert sample[key] is not None, \
@@ -230,9 +230,9 @@ if __name__ == '__main__':
 
     """ So this method is basically ready-to-use in training pipeline. Here, it's just for testing. """
     test_batch_size = 8
-    displacement_val = np.random.randn(2, 3, 3) * 5.84
+
     transforms = T.Compose([
-        T.RandomApply([RandomElastic(alpha=2, sigma=0.06)], p=0.85),
+        T.RandomApply([RandomElastic(alpha=0.5, sigma=0.05)], p=0.85),
         T.ToTensor(),
         T.RandomApply([T.RandomAdjustSharpness(sharpness_factor=5.39)], p=0.44),
         T.RandomApply([T.RandomRotation(degrees=3.09)], p=0.59),
