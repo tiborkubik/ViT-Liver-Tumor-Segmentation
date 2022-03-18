@@ -42,10 +42,11 @@ logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 class LiverTumorDataset(Dataset):
 
-    def __init__(self, dataset_path, transforms=None):
+    def __init__(self, dataset_path, transforms_img=None, transforms_mask=None):
 
         self.dataset_path = dataset_path
-        self.transforms = transforms
+        self.transforms_img = transforms_img
+        self.transforms_mask = transforms_mask
 
         self.slices = []  # One sample: tuple (slice .png path, mask .png path).
 
@@ -76,23 +77,28 @@ class LiverTumorDataset(Dataset):
         }
 
         seed = np.random.randint(0, 2 ** 32)
-        if self.transforms is not None:
+        if self.transforms_img is not None:
             for key in sample:
                 random.seed(seed)
                 np.random.seed(seed)
                 torch.manual_seed(seed)
-                sample[key] = self.transforms(sample[key])
+
+                if 'mask' in key:
+                    sample[key] = self.transforms_mask(sample[key])
+                else:
+                    sample[key] = self.transforms_img(sample[key])
+
         # Debugging purposes
         # assert torch.all(sample['images'] == sample['masks'])
 
         # Visualisation purposes
-        # augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks_liver'].numpy().squeeze())
+        augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks_liver'].numpy().squeeze())
 
         for key in sample:
             assert sample[key] is not None, \
                 f'Invalid {key} in sample {self.slices[item]}'
 
-        sample['masks'] = torch.concat([sample['masks_liver'],sample['masks_tumor']])
+        sample['masks'] = torch.concat([sample['masks_liver'], sample['masks_tumor']])
         del sample['masks_liver']
         del sample['masks_tumor']
 
@@ -103,7 +109,7 @@ class LiverTumorDataset(Dataset):
         return len(self.slices)
 
 
-def get_dataset_loaders(dataset_dir, transforms=None, batch_size=32, workers=0,
+def get_dataset_loaders(dataset_dir, transforms_img=None, transforms_mask=None, batch_size=32, workers=0,
                         validation_split=.2, random=True, ddp=False):
     """
     Method prepares torch dataset loaders for the training.
@@ -130,7 +136,8 @@ def get_dataset_loaders(dataset_dir, transforms=None, batch_size=32, workers=0,
     """
     train_split = 1 - validation_split
 
-    dataset = LiverTumorDataset(dataset_path=dataset_dir, transforms=transforms)
+    dataset = LiverTumorDataset(dataset_path=dataset_dir, transforms_img=transforms_img,
+                                transforms_mask=transforms_mask)
 
     train_len = int(train_split * len(dataset))
     val_len = int(validation_split * len(dataset))
@@ -231,7 +238,7 @@ if __name__ == '__main__':
     """ So this method is basically ready-to-use in training pipeline. Here, it's just for testing. """
     test_batch_size = 8
 
-    transforms = T.Compose([
+    transforms = [
         T.RandomApply([RandomElastic(alpha=0.5, sigma=0.05)], p=0.85),
         T.ToTensor(),
         T.RandomApply([T.RandomAdjustSharpness(sharpness_factor=5.39)], p=0.44),
@@ -239,9 +246,11 @@ if __name__ == '__main__':
         T.RandomApply([T.RandomAffine(degrees=0, shear=3.68)], p=0.62),
         T.RandomApply([T.ColorJitter(brightness=0.959)], p=0.71),
         T.RandomApply([Invert()], p=0.5)
-    ])
+    ]
 
-    train_loader, val_loader = get_dataset_loaders('data/train-val/', batch_size=test_batch_size, transforms=transforms)
+    train_loader, val_loader = get_dataset_loaders('data/train-val/', batch_size=test_batch_size,
+                                                   transforms_img=T.Compose(transforms),
+                                                   transforms_mask=T.Compose(transforms[:-2]))
 
     sample = next(iter(train_loader))
     #
