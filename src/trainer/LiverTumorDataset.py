@@ -25,6 +25,7 @@ import matplotlib
 import numpy as np
 import nibabel as nib
 import random
+import matplotlib.pyplot as plt
 
 from torchvision import transforms as T
 from torch.utils.data.distributed import DistributedSampler
@@ -60,6 +61,8 @@ class LiverTumorDataset(Dataset):
             mask_path = slice_path.replace('volume', 'segmentation').replace('vols', 'segs')
             self.slices.append((slice_path, mask_path))
 
+        self.slices = self.slices[:2000]
+
     def __getitem__(self, item):
 
         slice = cv2.imread(self.slices[item][0], cv2.IMREAD_GRAYSCALE)
@@ -71,7 +74,7 @@ class LiverTumorDataset(Dataset):
                           interpolation=cv2.INTER_AREA)
 
         sample = {
-            'images': slice,
+            'images': normalize_slice(slice),
             'masks_liver': (mask == 1.0).astype(float),
             'masks_tumor': (mask == 2.0).astype(float),
         }
@@ -109,8 +112,8 @@ class LiverTumorDataset(Dataset):
         return len(self.slices)
 
 
-def get_dataset_loaders(dataset_dir, transforms_img=None, transforms_mask=None, batch_size=32, workers=0,
-                        validation_split=.2, random=True, ddp=False):
+def get_dataset_loaders(train_path, val_path, transforms_img=None, transforms_mask=None, batch_size=32, workers=0,
+                        random=True, ddp=False):
     """
     Method prepares torch dataset loaders for the training.
 
@@ -124,36 +127,31 @@ def get_dataset_loaders(dataset_dir, transforms_img=None, transforms_mask=None, 
         -   It creates the sampler instances (if needed) and the loaders itself.
             The returned loaders are inherited from torch Data Loaders, so they can be directly used in training loop.
 
-    :param dataset_dir: Path to the dataset of TRAINING+VAL part only!
-    :param transforms: Augmentation to be applied during training. Default is None.
+    :param train_path: Path to the dataset of TRAINING part only!
+    :param val_path: Path to the dataset of VALIDATION part only!
+    :param transforms_img: Transforms applied on training images.
+    :param transforms_mask: Transforms applied only on the masks.
     :param batch_size: Training batch size.
     :param workers: Number of workers for parallel data loading. Depends on the number of CPUs available.
-    :param validation_split: From range [0.0, 1.0] -> The percentage of data for validation. Default is 0.2.
     :param random: Randomize choice of train/val split.
     :param ddp: Enable when multi-gpu training.
 
     :return: Train and validation loader.
     """
-    train_split = 1 - validation_split
 
-    dataset = LiverTumorDataset(dataset_path=dataset_dir, transforms_img=transforms_img,
-                                transforms_mask=transforms_mask)
+    train_ds = LiverTumorDataset(dataset_path=train_path,
+                                 transforms_img=transforms_img,
+                                 transforms_mask=transforms_mask)
 
-    train_len = int(train_split * len(dataset))
-    val_len = int(validation_split * len(dataset))
+    val_ds = LiverTumorDataset(dataset_path=val_path,
+                               transforms_img=transforms_img,
+                               transforms_mask=transforms_mask)
 
-    logging.info(f'Length of whole dataset: {len(dataset)}.')
-    logging.info(f'With the splitting of {validation_split}:')
+    train_len = len(train_ds)
+    val_len = len(val_ds)
+
+    logging.info(f'Length of whole dataset: {len(train_ds) + len(val_ds)}.')
     logging.info(f'Length of training set: {train_len}, length of validation set: {val_len}.')
-
-    if random:
-        difference = len(dataset) - train_len - val_len  # Just stupid workaround for random splitting and rounding :).
-        train_ds, val_ds = random_split(dataset,
-                                        [train_len + difference, val_len],
-                                        generator=torch.Generator().manual_seed(42))
-    else:
-        train_ds = Subset(dataset, np.arange(0, train_len))
-        val_ds = Subset(dataset, np.arange(train_len, train_len + val_len))
 
     train_sampler = DistributedSampler(train_ds) if ddp else None
     val_sampler = DistributedSampler(val_ds) if ddp else None
@@ -163,16 +161,16 @@ def get_dataset_loaders(dataset_dir, transforms_img=None, transforms_mask=None, 
     val_loader = DataLoader(val_ds, sampler=val_sampler, **loader_kwargs)
 
     if batch_size is not None:
-        if len(train_loader.dataset.indices) < batch_size:
+        if len(train_loader.dataset.slices) < batch_size:
             logging.warning(f'Training data subset too small: {len(train_loader.dataset.indices)}.')
 
-        if len(val_loader.dataset.indices) < batch_size:
+        if len(val_loader.dataset.slices) < batch_size:
             logging.warning(f'Validation data subset too small: {len(val_loader.dataset.indices)}.')
 
     return train_loader, val_loader
 
 
-def normalize_slice(ct_slice, window=(1500, -600)):
+def normalize_slice(ct_slice, window=(config.TYPICAL_LIVER_WW, config.TYPICAL_LIVER_WL)):
     """
     Normalize CT slice, by windowing over predefined levels. Default window param corresponds to liver window form from
     https://docs.fast.ai/medical.imaging.
@@ -182,6 +180,7 @@ def normalize_slice(ct_slice, window=(1500, -600)):
     px_min, px_max = w_level - w_width // 2, w_level + w_width // 2
     px[px < px_min] = px_min
     px[px > px_max] = px_max
+
     return (px - px_min) / (px_max - px_min)
 
 
@@ -207,7 +206,9 @@ def pre_process_niis(path):
                      for path, subdir, files in os.walk(w_path)
                      for file in glob.glob(os.path.join(path, '*.nii'))]
 
-    for nii_file in all_nii_files:
+    for i, nii_file in enumerate(all_nii_files):
+        print(f'[{i}/{len(all_nii_files)}] Processing file {nii_file}.')
+
         vol = nib.load(nii_file)
         vol = vol.get_fdata()
         num_slices = vol.shape[2]  # The shape is denoted e.g (512, 512, 826), where the last one is num of slices.
@@ -215,7 +216,7 @@ def pre_process_niis(path):
         vol_name = nii_file.split(".")[-2].split('/')[-1]
 
         for i in range(num_slices):
-            cv2.imwrite(os.path.join(path, f'vols-2d/{vol_name}-{i}.png'), normalize_slice(vol[:, :, i]))
+            cv2.imwrite(os.path.join(path, f'vols-2d/{vol_name}-{i}.png'), vol[:, :, i])
 
         seg_nii_path = nii_file.replace('volume', 'segmentation').replace('vols', 'segs')
         seg = nib.load(seg_nii_path)

@@ -28,8 +28,10 @@ def parse_args():
     """Argument parsing for the config overwrite."""
     parser = argparse.ArgumentParser(description='Liver and Liver Tumor Segmentation from CT Scans of Human Abdomens',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-d', '--dataset-path', metavar='D', type=str,
-                        default=None, help='Path to 2D slices w. train and val slices.', dest='dataset_path')
+    parser.add_argument('-dt', '--dataset-train', metavar='D', type=str,
+                        default=None, help='Path to 2D slices w. train slices.', dest='dataset_train')
+    parser.add_argument('-dv', '--dataset-val', metavar='D', type=str,
+                        default=None, help='Path to 2D slices w. val slices.', dest='dataset_val')
     parser.add_argument('-e', '--epochs', metavar='E', type=int,
                         default=config.HYPERPARAMETERS['epochs'], help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?',
@@ -62,7 +64,8 @@ def parse_args():
                         dest='w_tumor')
     args = parser.parse_args()
 
-    assert args.dataset_path is not None
+    assert args.dataset_train is not None
+    assert args.dataset_val is not None
     assert args.network_name in ['UNet', 'AttentionUNet', 'TransUNet']
 
     return args
@@ -94,7 +97,8 @@ if __name__ == '__main__':
         trainer = Trainer(network=network,
                           network_name=args.network_name,
                           device=device,
-                          dataset_path=args.dataset_path,
+                          dataset_train=args.dataset_train,
+                          dataset_val=args.dataset_val,
                           epochs=args.epochs,
                           batch_size=args.batch_size,
                           weight_decay=args.weight_decay,

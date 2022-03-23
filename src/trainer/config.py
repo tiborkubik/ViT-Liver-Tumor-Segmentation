@@ -19,7 +19,7 @@ HYPERPARAMETERS = {
     'network': 'UNet',
 
     'batch_size': 32,
-    'epochs': 3,
+    'epochs': 150,
     'learning_rate': 1e-3,
 
     'lr_scheduler_patience': 5,
@@ -43,3 +43,6 @@ DIMENSIONS = {
     'input_net': 128,
     'output_net': 128
 }
+
+TYPICAL_LIVER_WW = 150
+TYPICAL_LIVER_WL = 30

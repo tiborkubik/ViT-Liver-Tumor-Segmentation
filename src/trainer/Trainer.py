@@ -21,24 +21,29 @@ import logging
 import datetime
 import LiverTumorDataset
 import torch.optim as optim
+import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from torch.nn import MSELoss
 from torch.optim import AdamW
 from torchvision import transforms
-from WeightedMSELoss import WeightedMSELoss
 from EarlyStopping import EarlyStopping
+from torchvision import transforms as T
+from WeightedMSELoss import WeightedMSELoss
+from src.trainer.transforms import RandomElastic, Invert
 
 
 class Trainer:
 
-    def __init__(self, network, network_name, device, dataset_path, epochs, batch_size, weight_decay, betas, adam_w_eps,
+    def __init__(self, network, network_name, device, dataset_train, dataset_val,
+                 epochs, batch_size, weight_decay, betas, adam_w_eps,
                  early_stopping, lr, lr_scheduler_patience, lr_scheduler_min_lr, lr_scheduler_factor, w_liver, w_tumor):
 
         self.network = network
         self.network_name = network_name
         self.device = device
-        self.dataset_path = dataset_path
+        self.dataset_train = dataset_train
+        self.dataset_val = dataset_val
 
         self.epochs = epochs
         self.batch_size = batch_size
@@ -71,11 +76,21 @@ class Trainer:
                                                               min_lr=self.lr_scheduler_min_lr,
                                                               factor=self.lr_scheduler_factor)
 
-        self.train_loader, self.val_loader = LiverTumorDataset.get_dataset_loaders(dataset_dir=self.dataset_path,
+        transforms = [
+            T.RandomApply([RandomElastic(alpha=0.5, sigma=0.05)], p=0.085),
+            T.ToTensor(),
+            T.RandomApply([T.RandomAdjustSharpness(sharpness_factor=5.39)], p=0.044),
+            T.RandomApply([T.RandomRotation(degrees=3.09)], p=0.059),
+            T.RandomApply([T.RandomAffine(degrees=0, shear=3.68)], p=0.062),
+            T.RandomApply([T.ColorJitter(brightness=0.959)], p=0.071),
+            T.RandomApply([Invert()], p=0.05)
+        ]
+
+        self.train_loader, self.val_loader = LiverTumorDataset.get_dataset_loaders(train_path=self.dataset_train,
+                                                                                   val_path=self.dataset_val,
                                                                                    batch_size=self.batch_size,
-                                                                                   transforms=transforms.Compose(  # @Lakoc
-                                                                                       [transforms.ToTensor],
-                                                                                   ))
+                                                                                   transforms_img=T.Compose(transforms),
+                                                                                   transforms_mask=T.Compose(transforms[:-2]))
 
         if self.early_stopping_flag:
             self.early_stopping = EarlyStopping(patience=config.HYPERPARAMETERS['early_stopping_patience'],
@@ -106,9 +121,15 @@ class Trainer:
             logging.info('Epoch {}/{}'.format(epoch, self.epochs))
             logging.info('-' * 10)
 
+            self.running_train_loss = 0.0
             self.epoch_train(epoch)
 
+            self.running_val_loss = 0.0
             self.epoch_validate(epoch)
+
+            plt.plot(self.training_loss_list)
+            plt.plot(self.validation_loss_list)
+            plt.show()
 
             if self.early_stopping_flag and self.stop_flag:  # We are overfitting, let's end training...
                 break
