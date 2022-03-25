@@ -19,41 +19,7 @@ import torch
 
 from torch import nn
 
-from src.networks.UNet import UpConv
-
-
-class DoubleConvBatchNorm(nn.Module):
-    """Double convolution with additional BN: Conv -> BN -> ReLU -> Conv -> BN -> ReLU."""
-
-    def __init__(self, in_channels, out_channels):
-        super(DoubleConvBatchNorm, self).__init__()
-
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels=in_channels,
-                      out_channels=out_channels,
-                      kernel_size=3,
-                      stride=1,
-                      padding=1,
-                      bias=True),  # Bias = False is needed if I do not want to get the Batch Norm cancelled by conv
-
-            nn.BatchNorm2d(out_channels),
-
-            nn.ReLU(inplace=True),
-
-            nn.Conv2d(in_channels=out_channels,
-                      out_channels=out_channels,
-                      kernel_size=3,
-                      stride=1,
-                      padding=1,
-                      bias=True),  # Bias = False is needed if I do not want to get the Batch Norm cancelled by conv
-
-            nn.BatchNorm2d(out_channels),
-
-            nn.ReLU(inplace=True)
-        )
-
-    def forward(self, image):
-        return self.conv(image)
+from src.networks.UNet import UpConv, DoubleConvBatchNorm
 
 
 class AttentionBlock(nn.Module):
