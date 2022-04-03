@@ -20,6 +20,7 @@ import logging
 import argparse
 
 from src.networks.UNet import UNet
+from src.networks.utils import create_model
 from src.trainer.Trainer import Trainer
 from src.networks.AttentionUNet import AttentionUNet
 
@@ -75,16 +76,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = parse_args()
 
-    in_channels = 1  # BW images
-    out_channels = 2  # Liver & Tumor mask
-
-    if args.network_name == 'UNet':
-        network = UNet(in_channels=in_channels, out_channels=out_channels,
-                       batch_norm=True, decoder_mode='upconv')
-    elif args.network_name == 'AttentionUNet':
-        network = AttentionUNet(in_channels=in_channels, out_channels=out_channels)
-    else:
-        network = NestedUNet(in_channels=in_channels, out_channels=out_channels)
+    network = create_model(args.network_name)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     network.to(device)
