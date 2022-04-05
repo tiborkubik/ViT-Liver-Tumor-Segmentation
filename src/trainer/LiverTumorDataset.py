@@ -29,7 +29,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchvision import transforms as T
 
-import config
+import src.trainer.config as config
 from src.trainer.transforms import Invert, RandomElastic
 
 matplotlib.rcParams["figure.dpi"] = 400
@@ -47,13 +47,17 @@ class LiverTumorDataset(Dataset):
         self.transforms_img = transforms_img
         self.transforms_mask = transforms_mask
 
+        self.current_slice_idx = 0  # Current position of iterable
         self.slices = []  # One sample: tuple (slice .png path, mask .png path).
 
-        w_path = self.dataset_path + 'vols-2d/'
+        w_path = os.path.join(self.dataset_path, 'vols-2d/')
 
         all_slice_files = [file
                            for path, subdir, files in os.walk(w_path)
                            for file in glob.glob(os.path.join(path, EXT))]
+
+        if len(all_slice_files) == 0:
+            logging.warning(F"No volume file found in {w_path}")
 
         for slice_path in all_slice_files:
             mask_path = slice_path.replace('volume', 'segmentation').replace('vols', 'segs')
@@ -62,17 +66,20 @@ class LiverTumorDataset(Dataset):
         self.slices = self.slices[:2000]
 
     def __getitem__(self, item):
+        volume_path = self.slices[item][0]
+        segmentation_path = self.slices[item][1]
+        vol_idx = self._get_vol_idx(volume_path)
 
-        slice = cv2.imread(self.slices[item][0], cv2.IMREAD_GRAYSCALE)
+        slice = cv2.imread(volume_path, cv2.IMREAD_GRAYSCALE)
         slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
                            interpolation=cv2.INTER_AREA)
 
-        mask = cv2.imread(self.slices[item][1], cv2.IMREAD_GRAYSCALE)
+        mask = cv2.imread(segmentation_path, cv2.IMREAD_GRAYSCALE)
         mask = cv2.resize(mask, (config.DIMENSIONS['output_net'], config.DIMENSIONS['output_net']),
                           interpolation=cv2.INTER_AREA)
 
         sample = {
-            'images': normalize_slice(slice),
+            'images': torch.tensor(normalize_slice(slice)),
             'masks_liver': (mask == 1.0).astype(float),
             'masks_tumor': (mask == 2.0).astype(float),
         }
@@ -101,14 +108,28 @@ class LiverTumorDataset(Dataset):
 
         sample['masks'] = torch.concat([torch.from_numpy(sample['masks_liver']),
                                         torch.from_numpy(sample['masks_tumor'])])
+        sample['vol_idx'] = vol_idx
         del sample['masks_liver']
         del sample['masks_tumor']
 
         return sample
 
-    def __len__(self):
+    def _get_vol_idx(self, path: str):
+        vol_idx = path.split('-')[-2]
+        return int(vol_idx)
 
+    def __len__(self):
         return len(self.slices)
+
+    def __iter__(self):
+        self.current_slice_idx = 0
+        return self
+
+    def __next__(self):
+        self.current_slice_idx += 1
+        if self.current_slice_idx < len(self):
+            return self.__getitem__(self.current_slice_idx)
+        raise StopIteration
 
 
 def get_dataset_loader(dataset_path, transforms_img=None, transforms_mask=None, batch_size=32, workers=0,
