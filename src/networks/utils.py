@@ -19,6 +19,12 @@ def create_model(network_name: str, weights_path: str = None):
         network = NestedUNet(in_channels=in_channels, out_channels=out_channels)
 
     if weights_path is not None:
-        network.load_state_dict(torch.load(weights_path))
+        if torch.cuda.is_available():
+            map_location = lambda storage, loc: storage.cuda()
+        else:
+            map_location = 'cpu'
+
+        weights = torch.load(weights_path, map_location=map_location)
+        network.load_state_dict(weights)
 
     return network
