@@ -1,3 +1,4 @@
+import argparse
 from typing import List
 
 import torch
@@ -51,14 +52,33 @@ class Evaluator:
         pass
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Evaluation of Liver and Liver Tumor Segmentation from CT Scans of '
+                                                 'Human Abdomens',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-d', '--dataset', metavar='D', type=str,
+                        default=None, help='Path to 2D slices')
+    parser.add_argument('-w', '--weights', metavar='W', type=str,
+                        default='trained_weights/UNet/03-25-18-49-14-UNet.pt', help='Trained model weights')
+    parser.add_argument('-n', '--network-name', metavar='NN', type=str,
+                        default='UNet', help='Network name')
+    args = parser.parse_args()
+
+    assert args.dataset is not None
+    assert args.weights is not None
+    assert args.network_name in ['UNet', 'AttentionUNet', 'TransUNet']
+
+    return args
+
+
 if __name__ == "__main__":
-    network_name = 'UNet'
-    model = create_model(network_name, 'trained_weights/UNet/03-25-18-49-14-UNet.pt')
+    args = parse_args()
+    model = create_model(args.network_name, args.weights)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     dice_metric = DicePerVolume()
     metrics = [dice_metric]
-    evaluator = Evaluator('dataset/test', model, device, metrics)
+    evaluator = Evaluator(args.dataset, model, device, metrics)
     evaluator.evaluate()
 
     print('Per volume dice score:', dice_metric.compute_per_volume())
