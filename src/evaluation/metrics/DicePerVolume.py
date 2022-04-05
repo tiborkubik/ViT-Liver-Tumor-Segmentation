@@ -25,8 +25,9 @@ class VolumeMetric(ABC):
 
 class DicePerVolume(VolumeMetric):
 
-    def __init__(self):
+    def __init__(self, pred_threshold=0.3):
         super().__init__()
+        self.pred_threshold = pred_threshold
         self.vols_sum = {}
         self.vols_counts = {}
 
@@ -35,6 +36,7 @@ class DicePerVolume(VolumeMetric):
             self.vols_sum[vol_idx] = torch.tensor(0, dtype=torch.float32)
             self.vols_counts[vol_idx] = torch.tensor(0, dtype=torch.long)
 
+        pred_slice = (pred_slice > self.pred_threshold).float()
         dice_score = metric.dc(pred_slice.numpy(), target_slice.numpy())
         self.vols_sum[vol_idx] += dice_score
         self.vols_counts[vol_idx] += 1
