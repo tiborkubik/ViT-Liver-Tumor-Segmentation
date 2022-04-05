@@ -15,10 +15,10 @@
     CT Scans of Human Abdomens' for KNN/2021L course.
 """
 import torch
-import config
 import logging
 import argparse
 
+import src.trainer.config as config
 from src.networks.UNet import UNet
 from src.networks.utils import create_model
 from src.trainer.Trainer import Trainer
