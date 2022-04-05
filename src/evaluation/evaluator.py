@@ -1,12 +1,17 @@
 import argparse
-from typing import List
+import os
+from typing import List, Tuple
 
+import cv2
+import nibabel as nib
+import numpy as np
 import torch
 from tqdm import tqdm
 
 from src.evaluation.metrics.DicePerVolume import DicePerVolume, VolumeMetric
 from src.networks.utils import create_model
-from src.trainer.LiverTumorDataset import LiverTumorDataset
+from src.trainer import config
+from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
 
 
 class Evaluator:
@@ -43,13 +48,58 @@ class Evaluator:
                 for metric in self.metrics:
                     metric.update(predictions, masks_reshaped, vol_idx)
 
-    def create_nii(self, volume_idx):
-        # For each slice
-        # Predict liver mask
-        # Predict tumor mask
-        # Append both
-        # Save as nii
-        pass
+    def create_nii(self, volume_idx: int, save_path: str) -> None:
+        volume_path = os.path.join(self.dataset_path, 'vols-3d', F"volume-{volume_idx}.nii")
+        volume_image = nib.load(volume_path)
+        volume_data = volume_image.get_fdata()
+        num_slices = volume_data.shape[2]
+
+        liver_masks = []
+        tumor_masks = []
+
+        with torch.no_grad():
+            for slice_idx in range(num_slices):
+                slice = self._prepare_slice(volume_data, slice_idx)
+                inputs = torch.tensor(slice).type(torch.FloatTensor).to(self.device)
+
+                # Add batch and channel dimension
+                inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
+
+                slice_predictions = self.model(inputs_batch)[0]
+
+                liver_mask, tumor_mask = self._postprocesses_mask(slice_predictions.numpy(),
+                                                                  new_size=volume_data.shape[:2],
+                                                                  threshold=0.3)
+                liver_masks.append(liver_mask)
+                tumor_masks.append(tumor_mask)
+
+        # Stack all slices into a single array
+        liver_slices = np.stack(liver_masks, -1)
+        tumor_slices = np.stack(tumor_masks, -1)
+
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        # Save as .nii files
+        liver_mask_path = os.path.join(save_path, f"segmentation_liver_{volume_idx}.nii")
+        tumor_mask_path = os.path.join(save_path, f"segmentation_tumor_{volume_idx}.nii")
+        nib.save(nib.Nifti1Image(liver_slices, affine=volume_image.affine), liver_mask_path)
+        nib.save(nib.Nifti1Image(tumor_slices, affine=volume_image.affine), tumor_mask_path)
+
+    def _prepare_slice(self, volume, slice_idx):
+        slice = volume[:, :, slice_idx]
+        resized_slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
+                                   interpolation=cv2.INTER_AREA)
+        normalized_slice = normalize_slice(resized_slice)
+        return normalized_slice
+
+    def _postprocesses_mask(self, pred_mask: np.ndarray, new_size: Tuple, threshold: float) -> Tuple[np.ndarray, np.ndarray]:
+        binarized_mask = (pred_mask > threshold).astype(np.float32)
+        liver_mask = binarized_mask[0]
+        tumor_mask = binarized_mask[1]
+        resized_liver_mask = cv2.resize(liver_mask, new_size, interpolation=cv2.INTER_AREA)
+        resized_tumor_mask = cv2.resize(tumor_mask, new_size, interpolation=cv2.INTER_AREA)
+        return resized_liver_mask, resized_tumor_mask
 
 
 def parse_args():
@@ -79,7 +129,9 @@ if __name__ == "__main__":
     dice_metric = DicePerVolume()
     metrics = [dice_metric]
     evaluator = Evaluator(args.dataset, model, device, metrics)
-    evaluator.evaluate()
 
-    print('Per volume dice score:', dice_metric.compute_per_volume())
-    print('Dice score:', dice_metric.compute_total())
+    # evaluator.evaluate()
+    # print('Per volume dice score:', dice_metric.compute_per_volume())
+    # print('Dice score:', dice_metric.compute_total())
+
+    evaluator.create_nii(0, 'dataset/predictions')
