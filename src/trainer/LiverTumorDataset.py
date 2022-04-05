@@ -15,24 +15,22 @@
     CT Scans of Human Abdomens' for KNN/2021L course.
 """
 
-import os
-import cv2
 import glob
-import torch
-import config
 import logging
-import matplotlib
-import numpy as np
-import nibabel as nib
+import os
 import random
-import matplotlib.pyplot as plt
 
-from torchvision import transforms as T
+import cv2
+import matplotlib
+import nibabel as nib
+import numpy as np
+import torch
+from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data import Dataset, Subset, random_split, DataLoader
+from torchvision import transforms as T
 
-from src.trainer.transforms import RandomElastic, Invert
-from src.documentation.plots import augmentation_diff
+import config
+from src.trainer.transforms import Invert, RandomElastic
 
 matplotlib.rcParams["figure.dpi"] = 400
 
@@ -95,13 +93,14 @@ class LiverTumorDataset(Dataset):
         # assert torch.all(sample['images'] == sample['masks'])
 
         # Visualisation purposes
-        augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks_liver'].numpy().squeeze())
+        # augmentation_diff(slice, sample['images'].squeeze(), mask, sample['masks_liver'].squeeze())
 
         for key in sample:
             assert sample[key] is not None, \
                 f'Invalid {key} in sample {self.slices[item]}'
 
-        sample['masks'] = torch.concat([sample['masks_liver'], sample['masks_tumor']])
+        sample['masks'] = torch.concat([torch.from_numpy(sample['masks_liver']),
+                                        torch.from_numpy(sample['masks_tumor'])])
         del sample['masks_liver']
         del sample['masks_tumor']
 
@@ -112,8 +111,8 @@ class LiverTumorDataset(Dataset):
         return len(self.slices)
 
 
-def get_dataset_loaders(train_path, val_path, transforms_img=None, transforms_mask=None, batch_size=32, workers=0,
-                        random=True, ddp=False):
+def get_dataset_loader(dataset_path, transforms_img=None, transforms_mask=None, batch_size=32, workers=0,
+                       random=True, ddp=False):
     """
     Method prepares torch dataset loaders for the training.
 
@@ -139,35 +138,24 @@ def get_dataset_loaders(train_path, val_path, transforms_img=None, transforms_ma
     :return: Train and validation loader.
     """
 
-    train_ds = LiverTumorDataset(dataset_path=train_path,
-                                 transforms_img=transforms_img,
-                                 transforms_mask=transforms_mask)
+    ds = LiverTumorDataset(dataset_path=dataset_path,
+                           transforms_img=transforms_img,
+                           transforms_mask=transforms_mask)
 
-    val_ds = LiverTumorDataset(dataset_path=val_path,
-                               transforms_img=transforms_img,
-                               transforms_mask=transforms_mask)
+    ds_len = len(ds)
 
-    train_len = len(train_ds)
-    val_len = len(val_ds)
+    logging.info(f'Length of dataset: {ds_len}.')
 
-    logging.info(f'Length of whole dataset: {len(train_ds) + len(val_ds)}.')
-    logging.info(f'Length of training set: {train_len}, length of validation set: {val_len}.')
-
-    train_sampler = DistributedSampler(train_ds) if ddp else None
-    val_sampler = DistributedSampler(val_ds) if ddp else None
+    sampler = DistributedSampler(ds) if ddp else None
 
     loader_kwargs = {'batch_size': batch_size, 'num_workers': workers, 'pin_memory': True, 'drop_last': True}
-    train_loader = DataLoader(train_ds, sampler=train_sampler, **loader_kwargs)
-    val_loader = DataLoader(val_ds, sampler=val_sampler, **loader_kwargs)
+    loader = DataLoader(ds, sampler=sampler, **loader_kwargs)
 
     if batch_size is not None:
-        if len(train_loader.dataset.slices) < batch_size:
-            logging.warning(f'Training data subset too small: {len(train_loader.dataset.indices)}.')
+        if len(loader.dataset.slices) < batch_size:
+            logging.warning(f'Training data subset too small: {len(loader.dataset.indices)}.')
 
-        if len(val_loader.dataset.slices) < batch_size:
-            logging.warning(f'Validation data subset too small: {len(val_loader.dataset.indices)}.')
-
-    return train_loader, val_loader
+    return loader
 
 
 def normalize_slice(ct_slice, window=(config.TYPICAL_LIVER_WW, config.TYPICAL_LIVER_WL)):
@@ -206,6 +194,9 @@ def pre_process_niis(path):
                      for path, subdir, files in os.walk(w_path)
                      for file in glob.glob(os.path.join(path, '*.nii'))]
 
+    if len(all_nii_files) == 0:
+        logging.warning(F"No .nii file was found in {path}")
+
     for i, nii_file in enumerate(all_nii_files):
         print(f'[{i}/{len(all_nii_files)}] Processing file {nii_file}.')
 
@@ -234,7 +225,7 @@ def pre_process_niis(path):
 
 if __name__ == '__main__':
     """ Uncomment this to extract the individual slices and masks as png images (from nii volumes). """
-    # pre_process_niis('data/train-val/')
+    # pre_process_niis('dataset/test/')
 
     """ So this method is basically ready-to-use in training pipeline. Here, it's just for testing. """
     test_batch_size = 8
@@ -249,11 +240,13 @@ if __name__ == '__main__':
         T.RandomApply([Invert()], p=0.5)
     ]
 
-    train_loader, val_loader = get_dataset_loaders('data/train-val/', batch_size=test_batch_size,
-                                                   transforms_img=T.Compose(transforms),
-                                                   transforms_mask=T.Compose(transforms[:-2]))
+    # train_loader = get_dataset_loader('data/train/', batch_size=test_batch_size,
+    #                                                transforms_img=T.Compose(transforms),
+    #                                                transforms_mask=T.Compose(transforms[:-2]))
 
-    sample = next(iter(train_loader))
+    test_loader = get_dataset_loader('dataset/test/', batch_size=test_batch_size)
+    sample = next(iter(test_loader))
+    pass
     #
     # f, axarr = plt.subplots(2, test_batch_size)
     # f.set_size_inches(10, 3)

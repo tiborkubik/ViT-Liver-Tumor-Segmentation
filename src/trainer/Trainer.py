@@ -14,23 +14,22 @@
     This file was created as a part of project called 'Visual Transformers for Liver and Liver Tumor Segmentation from
     CT Scans of Human Abdomens' for KNN/2021L course.
 """
-import time
-import torch
-import config
-import logging
 import datetime
-import LiverTumorDataset
-import torch.optim as optim
-import matplotlib.pyplot as plt
+import logging
+import time
 
-from tqdm import tqdm
-from torch.nn import MSELoss
+import matplotlib.pyplot as plt
+import torch
+import torch.optim as optim
 from torch.optim import AdamW
-from torchvision import transforms
-from EarlyStopping import EarlyStopping
 from torchvision import transforms as T
+from tqdm import tqdm
+
+import config
+import LiverTumorDataset
+from EarlyStopping import EarlyStopping
+from src.trainer.transforms import Invert, RandomElastic
 from WeightedMSELoss import WeightedMSELoss
-from src.trainer.transforms import RandomElastic, Invert
 
 
 class Trainer:
@@ -86,12 +85,14 @@ class Trainer:
             T.RandomApply([Invert()], p=0.05)
         ]
 
-        self.train_loader, self.val_loader = LiverTumorDataset.get_dataset_loaders(train_path=self.dataset_train,
-                                                                                   val_path=self.dataset_val,
-                                                                                   batch_size=self.batch_size,
-                                                                                   transforms_img=T.Compose(transforms),
-                                                                                   transforms_mask=T.Compose(transforms[:-2]))
-
+        self.train_loader = LiverTumorDataset.get_dataset_loader(dataset_path=self.dataset_train,
+                                                                 batch_size=self.batch_size,
+                                                                 transforms_img=T.Compose(transforms),
+                                                                 transforms_mask=T.Compose(transforms[:-2]))
+        self.val_loader = LiverTumorDataset.get_dataset_loader(dataset_path=self.dataset_val,
+                                                               batch_size=self.batch_size,
+                                                               transforms_img=T.Compose(transforms),
+                                                               transforms_mask=T.Compose(transforms[:-2]))
         if self.early_stopping_flag:
             self.early_stopping = EarlyStopping(patience=config.HYPERPARAMETERS['early_stopping_patience'],
                                                 path=f'../../trained-weights/{self.network_name}/best-weights.pt',
