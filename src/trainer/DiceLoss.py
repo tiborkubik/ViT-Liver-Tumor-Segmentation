@@ -15,8 +15,8 @@
     CT Scans of Human Abdomens' for KNN/2021L course.
 """
 
+import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class DiceLoss(nn.Module):
@@ -25,7 +25,7 @@ class DiceLoss(nn.Module):
         super(DiceLoss, self).__init__()
 
     def forward(self, inputs, targets, smooth=1):
-        inputs = F.sigmoid(inputs)
+        inputs = torch.sigmoid(inputs)
 
         # flatten label and prediction tensors
         inputs = inputs.view(-1)

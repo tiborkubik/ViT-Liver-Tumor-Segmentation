@@ -24,9 +24,10 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 
 from tqdm import tqdm
-from torch.nn import MSELoss
+from DiceLoss import DiceLoss
 from torch.optim import AdamW
-from torchvision import transforms
+from DiceBCELoss import DiceBCELoss
+from torch.nn import BCEWithLogitsLoss
 from EarlyStopping import EarlyStopping
 from torchvision import transforms as T
 from WeightedMSELoss import WeightedMSELoss
@@ -36,7 +37,7 @@ from src.trainer.transforms import RandomElastic, Invert
 class Trainer:
 
     def __init__(self, network, network_name, device, dataset_train, dataset_val,
-                 epochs, batch_size, weight_decay, betas, adam_w_eps,
+                 epochs, batch_size, loss, weight_decay, betas, adam_w_eps,
                  early_stopping, lr, lr_scheduler_patience, lr_scheduler_min_lr, lr_scheduler_factor, w_liver, w_tumor):
 
         self.network = network
@@ -61,8 +62,8 @@ class Trainer:
         self.w_liver = w_liver
         self.w_tumor = w_tumor
 
-        self.criterion = WeightedMSELoss(w_liver=self.w_liver,
-                                         w_tumor=self.w_tumor)
+        self.loss = loss
+        self.criterion = self.select_criterion()
 
         self.optimizer = AdamW(params=self.network.parameters(),
                                lr=self.lr,
@@ -110,7 +111,15 @@ class Trainer:
 
         logging.info(f'Training run ID: {self.training_run_id}.')
 
-        # TODO: plot training and validation loss...
+    def select_criterion(self):
+        if self.loss == 'MSE':
+            return WeightedMSELoss()
+        if self.loss == 'Dice':
+            return DiceLoss()
+        if self.loss == 'BCE':
+            return BCEWithLogitsLoss()
+        if self.loss == 'DiceBCE':
+            return DiceBCELoss()
 
     def training(self):
         start_time = time.time()
@@ -129,7 +138,7 @@ class Trainer:
 
             plt.plot(self.training_loss_list)
             plt.plot(self.validation_loss_list)
-            plt.show()
+            plt.savefig(f'../../documentation/loss-{epoch}.png')
 
             if self.early_stopping_flag and self.stop_flag:  # We are overfitting, let's end training...
                 break

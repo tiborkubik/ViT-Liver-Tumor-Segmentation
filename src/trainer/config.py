@@ -17,6 +17,7 @@
 
 HYPERPARAMETERS = {
     'network': 'UNet',
+    'loss': 'DiceBCE',
 
     'batch_size': 32,
     'epochs': 150,

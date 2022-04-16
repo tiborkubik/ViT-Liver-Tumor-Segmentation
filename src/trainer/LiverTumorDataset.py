@@ -61,8 +61,6 @@ class LiverTumorDataset(Dataset):
             mask_path = slice_path.replace('volume', 'segmentation').replace('vols', 'segs')
             self.slices.append((slice_path, mask_path))
 
-        self.slices = self.slices[:2000]
-
     def __getitem__(self, item):
 
         slice = cv2.imread(self.slices[item][0], cv2.IMREAD_GRAYSCALE)
@@ -79,7 +77,7 @@ class LiverTumorDataset(Dataset):
             'masks_tumor': (mask == 2.0).astype(float),
         }
 
-        seed = np.random.randint(0, 2 ** 32)
+        seed = np.random.randint(0, 2 ** 31)
         if self.transforms_img is not None:
             for key in sample:
                 random.seed(seed)
@@ -95,7 +93,7 @@ class LiverTumorDataset(Dataset):
         # assert torch.all(sample['images'] == sample['masks'])
 
         # Visualisation purposes
-        augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks_liver'].numpy().squeeze())
+        # augmentation_diff(slice, sample['images'].numpy().squeeze(), mask, sample['masks_liver'].numpy().squeeze())
 
         for key in sample:
             assert sample[key] is not None, \

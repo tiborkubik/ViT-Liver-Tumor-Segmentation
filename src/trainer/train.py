@@ -22,6 +22,7 @@ import argparse
 from src.networks.UNet import UNet
 from src.trainer.Trainer import Trainer
 from src.networks.AttentionUNet import AttentionUNet
+# from src.networks.TransUNet import TransUNet
 
 
 def parse_args():
@@ -36,6 +37,8 @@ def parse_args():
                         default=config.HYPERPARAMETERS['epochs'], help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?',
                         default=config.HYPERPARAMETERS['batch_size'], help='Batch size', dest='batch_size')
+    parser.add_argument('-lo', '--loss', metavar='LO', type=str,
+                        default=config.HYPERPARAMETERS['loss'], help='Loss function for training', dest='loss')
     parser.add_argument('-w', '--weight-decay', metavar='WD', type=float, nargs='?',
                         default=config.HYPERPARAMETERS['weight_decay'], help='Weight decay', dest='weight_decay')
     parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?',
@@ -67,6 +70,7 @@ def parse_args():
     assert args.dataset_train is not None
     assert args.dataset_val is not None
     assert args.network_name in ['UNet', 'AttentionUNet', 'TransUNet']
+    assert args.loss in ['MSE', 'Dice', 'BCE', 'DiceBCE']
 
     return args
 
@@ -84,7 +88,8 @@ if __name__ == '__main__':
     elif args.network_name == 'AttentionUNet':
         network = AttentionUNet(in_channels=in_channels, out_channels=out_channels)
     else:
-        network = NestedUNet(in_channels=in_channels, out_channels=out_channels)
+        ... # TODO @Lakoc
+        # network = TransUNet()
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     network.to(device)
@@ -101,6 +106,7 @@ if __name__ == '__main__':
                           dataset_val=args.dataset_val,
                           epochs=args.epochs,
                           batch_size=args.batch_size,
+                          loss=args.loss,
                           weight_decay=args.weight_decay,
                           betas=args.betas,
                           adam_w_eps=args.adam_w_eps,
