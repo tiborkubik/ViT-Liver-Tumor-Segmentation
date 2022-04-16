@@ -15,8 +15,8 @@
     CT Scans of Human Abdomens' for KNN/2021L course.
 """
 
-import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class DiceLoss(nn.Module):
