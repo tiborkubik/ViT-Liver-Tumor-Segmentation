@@ -36,12 +36,13 @@ from src.trainer.transforms import RandomElastic, Invert
 
 class Trainer:
 
-    def __init__(self, network, network_name, device, dataset_train, dataset_val,
+    def __init__(self, network, network_name, training_mode, device, dataset_train, dataset_val,
                  epochs, batch_size, loss, weight_decay, betas, adam_w_eps,
                  early_stopping, lr, lr_scheduler_patience, lr_scheduler_min_lr, lr_scheduler_factor, w_liver, w_tumor):
 
         self.network = network
         self.network_name = network_name
+        self.training_mode = training_mode
         self.device = device
         self.dataset_train = dataset_train
         self.dataset_val = dataset_val
@@ -89,6 +90,7 @@ class Trainer:
 
         self.train_loader, self.val_loader = LiverTumorDataset.get_dataset_loaders(train_path=self.dataset_train,
                                                                                    val_path=self.dataset_val,
+                                                                                   training_mode=self.training_mode,
                                                                                    batch_size=self.batch_size,
                                                                                    transforms_img=T.Compose(transforms),
                                                                                    transforms_mask=T.Compose(transforms[:-2]))
@@ -176,7 +178,7 @@ class Trainer:
             self.running_train_loss += loss.item()
 
             loop.set_description(f'Training Epoch {epoch_id}/{self.epochs}')
-            loop.set_postfix(loss=loss.item() * self.batch_size)
+            loop.set_postfix(loss=loss.item())
 
         self.training_loss_list.append(self.running_train_loss)
 
@@ -199,7 +201,7 @@ class Trainer:
                 losses_for_scheduler.append(loss.item())
 
                 loop.set_description(f'Validating Epoch {epoch_id}/{self.epochs}')
-                loop.set_postfix(loss=loss.item() * self.batch_size)
+                loop.set_postfix(loss=loss.item())
 
             mean_loss = sum(losses_for_scheduler) / len(losses_for_scheduler)
             self.scheduler.step(mean_loss)

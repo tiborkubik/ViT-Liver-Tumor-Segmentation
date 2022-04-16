@@ -18,7 +18,7 @@
 HYPERPARAMETERS = {
     'network': 'UNet',
     'loss': 'DiceBCE',
-
+    'training_mode': '2.5D',
     'batch_size': 32,
     'epochs': 150,
     'learning_rate': 1e-3,

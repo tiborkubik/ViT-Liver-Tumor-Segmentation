@@ -33,6 +33,8 @@ def parse_args():
                         default=None, help='Path to 2D slices w. train slices.', dest='dataset_train')
     parser.add_argument('-dv', '--dataset-val', metavar='D', type=str,
                         default=None, help='Path to 2D slices w. val slices.', dest='dataset_val')
+    parser.add_argument('-tm', '--training-mode', metavar='TM', type=str,
+                        default=config.HYPERPARAMETERS['training_mode'], help='2D or 2.5D training...', dest='training_mode')
     parser.add_argument('-e', '--epochs', metavar='E', type=int,
                         default=config.HYPERPARAMETERS['epochs'], help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?',
@@ -69,6 +71,8 @@ def parse_args():
 
     assert args.dataset_train is not None
     assert args.dataset_val is not None
+
+    assert args.training_mode in ['2D', '2.5D']
     assert args.network_name in ['UNet', 'AttentionUNet', 'TransUNet']
     assert args.loss in ['MSE', 'Dice', 'BCE', 'DiceBCE']
 
@@ -79,7 +83,10 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = parse_args()
 
-    in_channels = 1  # BW images
+    if args.training_mode == '2D':
+        in_channels = 1  # BW images
+    elif args.training_mode == '2.5D':
+        in_channels = 9  # four neighboring slices...
     out_channels = 2  # Liver & Tumor mask
 
     if args.network_name == 'UNet':
@@ -101,6 +108,7 @@ if __name__ == '__main__':
     try:
         trainer = Trainer(network=network,
                           network_name=args.network_name,
+                          training_mode=args.training_mode,
                           device=device,
                           dataset_train=args.dataset_train,
                           dataset_val=args.dataset_val,
