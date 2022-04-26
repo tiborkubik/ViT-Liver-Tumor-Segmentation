@@ -29,7 +29,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchvision import transforms as T
 
-import config
+from src.trainer import config
 from src.trainer.transforms import Invert, RandomElastic
 
 matplotlib.rcParams["figure.dpi"] = 400
@@ -128,8 +128,7 @@ class LiverTumorDataset(Dataset):
                           interpolation=cv2.INTER_AREA)
 
         sample = {
-            # 'images': torch.tensor(normalize_slice(slice)),
-            'images': images,
+            'images': torch.tensor(images),
             'masks_liver': (mask == 1.0).astype(float),
             'masks_tumor': (mask == 2.0).astype(float),
         }
