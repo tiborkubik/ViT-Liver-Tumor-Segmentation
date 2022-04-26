@@ -15,16 +15,18 @@ echo "$PBS_JOBID is running on node $(hostname -f) in a scratch directory $SCRAT
 
 #Copy source codes
 echo "Copying ENV. $(date +"%T")"
-cp -r "$DATADIR/environment.yml" "$SCRATCHDIR" || {
+cp -r "$DATADIR/requirements.txt" "$SCRATCHDIR" || {
   echo >&2 "Couldnt copy srcdir to scratchdir."
   exit 2
 }
 
 module add conda-modules-py37
-conda env create -f "$SCRATCHDIR/environment.yml"
+conda create -n ViT-Liver-Tumor-Segmentation python=3.9.7
 conda activate ViT-Liver-Tumor-Segmentation
 
-echo "ENV created. $(date +"%T")"
+echo "ENV created. $(date +"%T") Installing requirements ..."
+pip install -r requirements.txt
+echo "All packages installed. $(date +"%T")"
 
 echo "Copying data from FE: $(date +"%T").."
 
