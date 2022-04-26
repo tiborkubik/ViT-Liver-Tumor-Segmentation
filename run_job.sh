@@ -1,0 +1,88 @@
+#!/bin/bash
+#PBS -N ViT-Liver-Tumor-Segmentation
+#PBS -q gpu
+#PBS -l select=1:gpu_cap=cuda75:cl_adan=True:mem=32gb:scratch_ssd=100gb
+#PBS -l walltime=24:00:00
+#PBS -m abe
+
+# Clean up after exit
+trap 'clean_scratch' EXIT
+
+JOB_ID="2D_TEST"
+DATADIR=/storage/brno2/home/lakoc/LITS/
+
+echo "$PBS_JOBID is running on node $(hostname -f) in a scratch directory $SCRATCHDIR: $(date +"%T")"
+
+module add conda-modules-py37
+conda env create -f environment.yml
+conda activate ViT-Liver-Tumor-Segmentation
+
+echo "ENV created. $(date +"%T")"
+
+echo "Copying data from FE: $(date +"%T").."
+
+# Copy dataset
+cp -r "$DATADIR/data" "$SCRATCHDIR/data" || {
+  echo >&2 "Couldnt copy dataset to scratchdir."
+  exit 2
+}
+
+#Copy source codes
+cp -r "$DATADIR/src" "$SCRATCHDIR/src" || {
+  echo >&2 "Couldnt copy srcdir to scratchdir."
+  exit 2
+}
+
+# Unzip dataset and split to seg, vol folders
+echo "Unzipping dataset: $(date +"%T")..."
+unzip "$SCRATCHDIR/data/Training_Batch1.zip"
+unzip "$SCRATCHDIR/data/Training_Batch2.zip"
+SUBDIR1="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 1/"
+SUBDIR2="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 2/"
+
+mkdir "$SCRATCHDIR/data/segs-3d"
+mkdir "$SCRATCHDIR/data/vols-3d"
+
+mv "$SCRATCHDIR/data/$SUBDIR1/seg*" "$SCRATCHDIR/data/segs-3d/"
+mv "$SCRATCHDIR/data/$SUBDIR2/seg*" "$SCRATCHDIR/data/segs-3d/"
+mv "$SCRATCHDIR/data/$SUBDIR1/vol*" "$SCRATCHDIR/data/vols-3d/"
+mv "$SCRATCHDIR/data/$SUBDIR2/vol*" "$SCRATCHDIR/data/vols-3d/"
+
+echo "Unzipping done: $(date +"%T")"
+
+# Split dataset to train and validation part
+echo "Creating validation and train split: $(date +"%T")..."
+export PYTHONPATH=$SCRATCHDIR
+python src/preprocess/split_dataset.py -d "$SCRATCHDIR/data"
+
+echo "Splits successfully created: $(date +"%T")"
+
+# Create 2d slices
+echo "Creating 2d slices from dataset: $(date +"%T")..."
+python "$SCRATCHDIR/src/preprocess/preprocess_niis.py" -dp "$SCRATCHDIR/data/train"
+python "$SCRATCHDIR/src/preprocess/preprocess_niis.py" -dp "$SCRATCHDIR/data/val"
+echo "Slicing done: $(date +"%T")"
+
+# Start training
+echo "All ready. Starting trainer: $(date +"%T")"
+python3 "$SCRATCHDIR/src/trainer/train.py" -dt data/train -dv data/val/ -tm 2D -b 64 -e 2
+
+echo "Cleaning environment: $(date +"%T")"
+conda deactivate
+conda env remove -n ViT-Liver-Tumor-Segmentation --yes
+
+echo "Training done. Copying back to FE: $(date +"%T")"
+# Copy data back to FE
+cp -r "$SCRATCHDIR/documentation" "$DATADIR/$JOB_ID" || {
+  echo >&2 "Couldnt copy documentation to datadir."
+  exit 3
+}
+cp -r "$SCRATCHDIR/trained-weights" "$DATADIR/$JOB_ID" || {
+  echo >&2 "Couldnt copy weights to datadir."
+  exit 3
+}
+
+cp -r "$SCRATCHDIR/metrics.log" "$DATADIR/$JOB_ID" || {
+  echo >&2 "Couldnt copy metrics log."
+  exit 3
+}

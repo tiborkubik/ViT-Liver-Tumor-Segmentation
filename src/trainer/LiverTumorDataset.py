@@ -22,14 +22,13 @@ import random
 
 import cv2
 import matplotlib
-import nibabel as nib
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchvision import transforms as T
 
-import config
+from src.trainer import config
 from src.trainer.transforms import Invert, RandomElastic
 
 matplotlib.rcParams["figure.dpi"] = 400
@@ -161,8 +160,11 @@ class LiverTumorDataset(Dataset):
             assert sample[key] is not None, \
                 f'Invalid {key} in sample {self.slices[item]}'
 
-        sample['masks'] = torch.concat([torch.from_numpy(sample['masks_liver']),
-                                        torch.from_numpy(sample['masks_tumor'])])
+        for key in sample:
+            if isinstance(sample[key], np.ndarray):
+                sample[key] = torch.from_numpy(sample[key])
+
+        sample['masks'] = torch.concat([sample['masks_liver'], sample['masks_tumor']])
         sample['vol_idx'] = vol_idx
         del sample['masks_liver']
         del sample['masks_tumor']
@@ -249,61 +251,7 @@ def normalize_slice(ct_slice, window=(config.TYPICAL_LIVER_WW, config.TYPICAL_LI
     return (px - px_min) / (px_max - px_min)
 
 
-def pre_process_niis(path):
-    """
-    Use this to extract slices and corresponding masks from .nii volumes as png images and store them on disk.
-
-    :param path: Path to the root of dataset folder.
-
-    :return: void
-    """
-    w_path = os.path.join(path, 'vols-3d')
-    vol_slices_path = os.path.join(path, 'vols-2d')
-    segs_slices_path = os.path.join(path, 'segs-2d')
-
-    if not os.path.exists(vol_slices_path):
-        os.makedirs(vol_slices_path)
-    if not os.path.exists(segs_slices_path):
-        os.makedirs(segs_slices_path)
-
-    # Paths of .nii volumes.
-    all_nii_files = [file
-                     for path, subdir, files in os.walk(w_path)
-                     for file in glob.glob(os.path.join(path, '*.nii'))]
-
-    if len(all_nii_files) == 0:
-        logging.warning(F"No .nii file was found in {path}")
-
-    for i, nii_file in enumerate(all_nii_files):
-        print(f'[{i}/{len(all_nii_files)}] Processing file {nii_file}.')
-
-        vol = nib.load(nii_file)
-        vol = vol.get_fdata()
-        num_slices = vol.shape[2]  # The shape is denoted e.g (512, 512, 826), where the last one is num of slices.
-
-        vol_name = nii_file.split(".")[-2].split('/')[-1]
-
-        for i in range(num_slices):
-            cv2.imwrite(os.path.join(path, f'vols-2d/{vol_name}-{i}.png'), vol[:, :, i])
-
-        seg_nii_path = nii_file.replace('volume', 'segmentation').replace('vols', 'segs')
-        seg = nib.load(seg_nii_path)
-        seg = seg.get_fdata()
-
-        seg_name = seg_nii_path.split(".")[-2].split('/')[-1]
-
-        """ Uncomment this to plot slice, mask and normalized slice sample"""
-        # if nii_file == 'data/train-val/vols-3d/volume-2.nii':
-        #     sample_id = 450
-        #     plot_slice_sample(vol[..., sample_id], normalize_slice(vol[..., sample_id].astype(np.float32)), seg[..., sample_id], savefig='documentation/slice_sample')
-        for i in range(num_slices):
-            cv2.imwrite(os.path.join(path, f'segs-2d/{seg_name}-{i}.png'), seg[:, :, i])
-
-
 if __name__ == '__main__':
-    """ Uncomment this to extract the individual slices and masks as png images (from nii volumes). """
-    # pre_process_niis('dataset/test/')
-
     """ So this method is basically ready-to-use in training pipeline. Here, it's just for testing. """
     test_batch_size = 8
 
