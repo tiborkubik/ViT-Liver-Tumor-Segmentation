@@ -9,7 +9,7 @@
 trap 'clean_scratch' EXIT
 
 JOB_ID="2D_TEST"
-DATADIR=/storage/brno2/home/lakoc/LITS/
+DATADIR=/storage/brno2/home/lakoc/ViT-Liver-Tumor-Segmentation
 
 echo "$PBS_JOBID is running on node $(hostname -f) in a scratch directory $SCRATCHDIR: $(date +"%T")"
 
