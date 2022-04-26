@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N ViT-Liver-Tumor-Segmentation
 #PBS -q gpu
-#PBS -l select=1:gpu_cap=cuda75:cl_adan=True:mem=32gb:scratch_ssd=100gb
+#PBS -l select=1:gpu_cap=cuda75:cl_adan=True:mem=32gb:scratch_local=100gb
 #PBS -l walltime=24:00:00
 #PBS -m abe
 
