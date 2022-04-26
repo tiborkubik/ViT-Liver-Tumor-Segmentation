@@ -15,11 +15,14 @@
     CT Scans of Human Abdomens' for KNN/2021L course.
 """
 import torch
-import config
 import logging
 import argparse
 
+import src.trainer.config as config
+from src.evaluation.evaluator import Evaluator
+from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, RAVD, VOE
 from src.networks.UNet import UNet
+from src.networks.utils import create_model
 from src.trainer.Trainer import Trainer
 from src.networks.AttentionUNet import AttentionUNet
 # from src.networks.TransUNet import TransUNet
@@ -83,20 +86,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = parse_args()
 
-    if args.training_mode == '2D':
-        in_channels = 1  # BW images
-    elif args.training_mode == '2.5D':
-        in_channels = 9  # four neighboring slices...
-    out_channels = 2  # Liver & Tumor mask
-
-    if args.network_name == 'UNet':
-        network = UNet(in_channels=in_channels, out_channels=out_channels,
-                       batch_norm=True, decoder_mode='upconv')
-    elif args.network_name == 'AttentionUNet':
-        network = AttentionUNet(in_channels=in_channels, out_channels=out_channels)
-    else:
-        ... # TODO @Lakoc
-        # network = TransUNet()
+    network = create_model(args.network_name, args.training_mode)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     network.to(device)
@@ -105,28 +95,33 @@ if __name__ == '__main__':
     logging.info(f'GPU name: {torch.cuda.get_device_name(0)}')
     logging.info(f'Training the weights of {args.network_name}')
 
-    try:
-        trainer = Trainer(network=network,
-                          network_name=args.network_name,
-                          training_mode=args.training_mode,
-                          device=device,
-                          dataset_train=args.dataset_train,
-                          dataset_val=args.dataset_val,
-                          epochs=args.epochs,
-                          batch_size=args.batch_size,
-                          loss=args.loss,
-                          weight_decay=args.weight_decay,
-                          betas=args.betas,
-                          adam_w_eps=args.adam_w_eps,
-                          early_stopping=args.early_stopping,
-                          lr=args.lr,
-                          lr_scheduler_patience=args.lr_scheduler_patience,
-                          lr_scheduler_min_lr=args.lr_scheduler_min_lr,
-                          lr_scheduler_factor=args.lr_scheduler_factor,
-                          w_liver=args.w_liver,
-                          w_tumor=args.w_tumor)
+    trainer = Trainer(network=network,
+                      network_name=args.network_name,
+                      training_mode=args.training_mode,
+                      device=device,
+                      dataset_train=args.dataset_train,
+                      dataset_val=args.dataset_val,
+                      epochs=args.epochs,
+                      batch_size=args.batch_size,
+                      loss=args.loss,
+                      weight_decay=args.weight_decay,
+                      betas=args.betas,
+                      adam_w_eps=args.adam_w_eps,
+                      early_stopping=args.early_stopping,
+                      lr=args.lr,
+                      lr_scheduler_patience=args.lr_scheduler_patience,
+                      lr_scheduler_min_lr=args.lr_scheduler_min_lr,
+                      lr_scheduler_factor=args.lr_scheduler_factor,
+                      w_liver=args.w_liver,
+                      w_tumor=args.w_tumor)
 
+    try:
         trainer.training()
+
+        liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
+        lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
+        evaluator = Evaluator(args.dataset_val, network, device, liver_metrics, lesion_metrics)
+        evaluator.evaluate()
 
     except KeyboardInterrupt:
         torch.save(network.state_dict(), 'interrupted_model.pt')
