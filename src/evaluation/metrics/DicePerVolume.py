@@ -53,6 +53,9 @@ class VolumeMetric(ABC):
 class DicePerVolume(VolumeMetric):
 
     def __init__(self):
+        """
+        Dice coefficient
+        """
         super().__init__('Dice')
 
     def compute_metric(self, pred_slice, target_slice):
@@ -63,6 +66,9 @@ class DicePerVolume(VolumeMetric):
 class VOE(VolumeMetric):
 
     def __init__(self):
+        """
+        Volume overlap error = 1 - 	Jaccard coefficient
+        """
         super().__init__('VOE')
 
     def compute_metric(self, pred_slice, target_slice):
@@ -73,6 +79,9 @@ class VOE(VolumeMetric):
 class MSD(VolumeMetric):
 
     def __init__(self):
+        """
+        Mean symmetric surface distance
+        """
         super().__init__('MSD')
 
     def compute_metric(self, pred_slice, target_slice):
@@ -84,6 +93,9 @@ class MSD(VolumeMetric):
 class ASSD(VolumeMetric):
 
     def __init__(self):
+        """
+        Average symmetric surface distance
+        """
         super().__init__('ASSD')
 
     def compute_metric(self, pred_slice, target_slice):
@@ -92,10 +104,23 @@ class ASSD(VolumeMetric):
 
 
 class ASD(VolumeMetric):
-
+    """
+    Average surface distance metric
+    """
     def __init__(self):
         super().__init__('ASD')
 
     def compute_metric(self, pred_slice, target_slice):
         asd_score = metric.asd(pred_slice.numpy(), target_slice.numpy())
         return asd_score
+
+class RAVD(VolumeMetric):
+    """
+    Relative absolute volume difference
+    """
+    def __init__(self):
+        super().__init__('RAVD')
+
+    def compute_metric(self, pred_slice, target_slice):
+        score = metric.ravd(pred_slice.numpy(), target_slice.numpy())
+        return score
