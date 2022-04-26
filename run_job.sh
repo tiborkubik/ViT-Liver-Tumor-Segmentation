@@ -13,6 +13,13 @@ DATADIR=/storage/brno2/home/lakoc/ViT-Liver-Tumor-Segmentation
 
 echo "$PBS_JOBID is running on node $(hostname -f) in a scratch directory $SCRATCHDIR: $(date +"%T")"
 
+#Copy source codes
+echo "Copying ENV. $(date +"%T")"
+cp -r "$DATADIR/environment.yml" "$SCRATCHDIR" || {
+  echo >&2 "Couldnt copy srcdir to scratchdir."
+  exit 2
+}
+
 module add conda-modules-py37
 conda env create -f environment.yml
 conda activate ViT-Liver-Tumor-Segmentation
@@ -37,8 +44,8 @@ cp -r "$DATADIR/src" "$SCRATCHDIR/src" || {
 echo "Unzipping dataset: $(date +"%T")..."
 unzip "$SCRATCHDIR/data/Training_Batch1.zip"
 unzip "$SCRATCHDIR/data/Training_Batch2.zip"
-SUBDIR1="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 1/"
-SUBDIR2="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 2/"
+SUBDIR1="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 1"
+SUBDIR2="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 2"
 
 mkdir "$SCRATCHDIR/data/segs-3d"
 mkdir "$SCRATCHDIR/data/vols-3d"
