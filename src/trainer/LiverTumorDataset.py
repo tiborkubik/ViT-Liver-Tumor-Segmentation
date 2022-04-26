@@ -29,7 +29,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchvision import transforms as T
 
-import src.trainer.config as config
+import config
 from src.trainer.transforms import Invert, RandomElastic
 
 matplotlib.rcParams["figure.dpi"] = 400
@@ -41,11 +41,12 @@ logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 class LiverTumorDataset(Dataset):
 
-    def __init__(self, dataset_path, transforms_img=None, transforms_mask=None):
+    def __init__(self, dataset_path, transforms_img=None, transforms_mask=None, training_mode='2D'):
 
         self.dataset_path = dataset_path
         self.transforms_img = transforms_img
         self.transforms_mask = transforms_mask
+        self.training_mode = training_mode
 
         self.current_slice_idx = 0  # Current position of iterable
         self.slices = []  # One sample: tuple (slice .png path, mask .png path).
@@ -63,28 +64,77 @@ class LiverTumorDataset(Dataset):
             mask_path = slice_path.replace('volume', 'segmentation').replace('vols', 'segs')
             self.slices.append((slice_path, mask_path))
 
-        self.slices = self.slices[:2000]
-
     def __getitem__(self, item):
+
         volume_path = self.slices[item][0]
         segmentation_path = self.slices[item][1]
         vol_idx = self._get_vol_idx(volume_path)
 
-        slice = cv2.imread(volume_path, cv2.IMREAD_GRAYSCALE)
-        slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
-                           interpolation=cv2.INTER_AREA)
+        slice_of_interest = cv2.imread(volume_path, cv2.IMREAD_GRAYSCALE)
+        slice_of_interest = cv2.resize(slice_of_interest,
+                                       (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
+                                       interpolation=cv2.INTER_AREA)
+
+        slice_of_interest = normalize_slice(slice_of_interest)
+
+        if self.training_mode == '2D':
+            images = slice_of_interest
+
+        elif self.training_mode == '2.5D':
+            neighbors_lower_z = []
+            neighbors_higher_z = []
+
+            filename, _ = os.path.splitext(self.slices[item][0])
+            slice_num = int(filename.split('-')[-1])
+            vol_num = int(filename.split('-')[-2])
+            vol_name = filename.split('-')[0] + '-' + filename.split('-')[1]
+            # Check if there are any neighbouring slices with lower z-value. Repeat slice of interest otherwise.
+            if slice_num < 4:
+                for i in range(0, 4):
+                    neighbors_lower_z.append(slice_of_interest)
+            else:
+                for i in range(4, 0, -1):
+                    slice = cv2.imread(vol_name + '-' + str(vol_num) + '-' + str(slice_num - i) + '.png',
+                                       cv2.IMREAD_GRAYSCALE)
+                    slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
+                                       interpolation=cv2.INTER_AREA)
+
+                    neighbors_lower_z.append(normalize_slice(slice))
+
+            # Check if there are any neighboring slices with higher z-value. Repeat slice of interest otherwise.
+            for i in range(1, 5):
+                if os.path.exists(vol_name + '-' + str(vol_num) + '-' + str(slice_num + i) + '.png'):
+                    slice = cv2.imread(vol_name + '-' + str(vol_num) + '-' + str(slice_num + i) + '.png',
+                                       cv2.IMREAD_GRAYSCALE)
+                    slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
+                                       interpolation=cv2.INTER_AREA)
+
+                    neighbors_higher_z.append(normalize_slice(slice))
+                else:
+                    neighbors_higher_z = []
+                    for _ in range(1, 5):
+                        neighbors_higher_z.append(slice_of_interest)
+
+                    break
+
+            images = neighbors_lower_z + [slice_of_interest] + neighbors_higher_z
+            ...
+        else:
+            # Should not come to this point...
+            images = ...
 
         mask = cv2.imread(segmentation_path, cv2.IMREAD_GRAYSCALE)
         mask = cv2.resize(mask, (config.DIMENSIONS['output_net'], config.DIMENSIONS['output_net']),
                           interpolation=cv2.INTER_AREA)
 
         sample = {
-            'images': torch.tensor(normalize_slice(slice)),
+            # 'images': torch.tensor(normalize_slice(slice)),
+            'images': images,
             'masks_liver': (mask == 1.0).astype(float),
             'masks_tumor': (mask == 2.0).astype(float),
         }
 
-        seed = np.random.randint(0, 2 ** 32)
+        seed = np.random.randint(0, 2 ** 31)
         if self.transforms_img is not None:
             for key in sample:
                 random.seed(seed)
@@ -94,14 +144,19 @@ class LiverTumorDataset(Dataset):
                 if 'mask' in key:
                     sample[key] = self.transforms_mask(sample[key])
                 else:
-                    sample[key] = self.transforms_img(sample[key])
+                    if self.training_mode == '2D':
+                        sample[key] = self.transforms_img(sample[key])
+                    else:
+                        for i in range(len(sample[key])):
+                            sample[key][i] = self.transforms_img(sample[key][i])
+
+                        sample[key] = torch.stack(sample[key]).squeeze()
 
         # Debugging purposes
         # assert torch.all(sample['images'] == sample['masks'])
 
         # Visualisation purposes
         # augmentation_diff(slice, sample['images'].squeeze(), mask, sample['masks_liver'].squeeze())
-
         for key in sample:
             assert sample[key] is not None, \
                 f'Invalid {key} in sample {self.slices[item]}'
@@ -132,8 +187,8 @@ class LiverTumorDataset(Dataset):
         raise StopIteration
 
 
-def get_dataset_loader(dataset_path, transforms_img=None, transforms_mask=None, batch_size=32, workers=0,
-                       random=True, ddp=False):
+def get_dataset_loader(dataset_path, transforms_img=None, transforms_mask=None, training_mode='2D', batch_size=32,
+                       workers=0, random=True, ddp=False):
     """
     Method prepares torch dataset loaders for the training.
 
@@ -161,7 +216,8 @@ def get_dataset_loader(dataset_path, transforms_img=None, transforms_mask=None, 
 
     ds = LiverTumorDataset(dataset_path=dataset_path,
                            transforms_img=transforms_img,
-                           transforms_mask=transforms_mask)
+                           transforms_mask=transforms_mask,
+                           training_mode=training_mode)
 
     ds_len = len(ds)
 

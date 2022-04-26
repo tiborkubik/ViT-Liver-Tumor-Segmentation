@@ -1,7 +1,7 @@
 """
-    :filename DiceLoss.py
+    :filename DiceBCELoss.py
 
-    :brief Dice Loss for medical image segmentation.
+    :brief Dice Loss combined with the Binary Cross-Entropy for medical image segmentation.
 
     :author Tibor Kubik
     :author Ladislav Ondris
@@ -17,14 +17,16 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
-class DiceLoss(nn.Module):
+class DiceBCELoss(nn.Module):
     def __init__(self):
-        
-        super(DiceLoss, self).__init__()
+
+        super(DiceBCELoss, self).__init__()
 
     def forward(self, inputs, targets, smooth=1):
+        # comment out if your model contains a sigmoid or equivalent activation layer
         inputs = torch.sigmoid(inputs)
 
         # flatten label and prediction tensors
@@ -32,6 +34,8 @@ class DiceLoss(nn.Module):
         targets = targets.view(-1)
 
         intersection = (inputs * targets).sum()
-        dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
+        dice_loss = 1 - (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
+        BCE = F.binary_cross_entropy_with_logits(inputs, targets, reduction='mean')
+        Dice_BCE = BCE + dice_loss
 
-        return 1 - dice
+        return Dice_BCE

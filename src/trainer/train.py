@@ -25,6 +25,7 @@ from src.networks.UNet import UNet
 from src.networks.utils import create_model
 from src.trainer.Trainer import Trainer
 from src.networks.AttentionUNet import AttentionUNet
+# from src.networks.TransUNet import TransUNet
 
 
 def parse_args():
@@ -35,10 +36,14 @@ def parse_args():
                         default=None, help='Path to 2D slices w. train slices.', dest='dataset_train')
     parser.add_argument('-dv', '--dataset-val', metavar='D', type=str,
                         default=None, help='Path to 2D slices w. val slices.', dest='dataset_val')
+    parser.add_argument('-tm', '--training-mode', metavar='TM', type=str,
+                        default=config.HYPERPARAMETERS['training_mode'], help='2D or 2.5D training...', dest='training_mode')
     parser.add_argument('-e', '--epochs', metavar='E', type=int,
                         default=config.HYPERPARAMETERS['epochs'], help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?',
                         default=config.HYPERPARAMETERS['batch_size'], help='Batch size', dest='batch_size')
+    parser.add_argument('-lo', '--loss', metavar='LO', type=str,
+                        default=config.HYPERPARAMETERS['loss'], help='Loss function for training', dest='loss')
     parser.add_argument('-w', '--weight-decay', metavar='WD', type=float, nargs='?',
                         default=config.HYPERPARAMETERS['weight_decay'], help='Weight decay', dest='weight_decay')
     parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?',
@@ -69,7 +74,10 @@ def parse_args():
 
     assert args.dataset_train is not None
     assert args.dataset_val is not None
+
+    assert args.training_mode in ['2D', '2.5D']
     assert args.network_name in ['UNet', 'AttentionUNet', 'TransUNet']
+    assert args.loss in ['MSE', 'Dice', 'BCE', 'DiceBCE']
 
     return args
 
@@ -78,7 +86,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = parse_args()
 
-    network = create_model(args.network_name)
+    network = create_model(args.network_name, args.training_mode)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     network.to(device)
@@ -89,11 +97,13 @@ if __name__ == '__main__':
 
     trainer = Trainer(network=network,
                       network_name=args.network_name,
+                      training_mode=args.training_mode,
                       device=device,
                       dataset_train=args.dataset_train,
                       dataset_val=args.dataset_val,
                       epochs=args.epochs,
                       batch_size=args.batch_size,
+                      loss=args.loss,
                       weight_decay=args.weight_decay,
                       betas=args.betas,
                       adam_w_eps=args.adam_w_eps,

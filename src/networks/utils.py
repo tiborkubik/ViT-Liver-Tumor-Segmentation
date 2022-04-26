@@ -4,11 +4,15 @@ from src.networks.AttentionUNet import AttentionUNet
 from src.networks.UNet import UNet
 
 
-def create_model(network_name: str, weights_path: str = None):
+def create_model(network_name: str, training_mode: str, weights_path: str = None):
+    assert network_name in ['UNet', 'AttentionUNet', 'TransUNet']
+
     in_channels = 1  # BW images
     out_channels = 2  # Liver & Tumor mask
-
-    assert network_name in ['UNet', 'AttentionUNet', 'TransUNet']
+    if training_mode == '2D':
+        in_channels = 1  # BW images
+    elif training_mode == '2.5D':
+        in_channels = 9  # four neighboring slices...
 
     if network_name == 'UNet':
         network = UNet(in_channels=in_channels, out_channels=out_channels,
@@ -16,7 +20,8 @@ def create_model(network_name: str, weights_path: str = None):
     elif network_name == 'AttentionUNet':
         network = AttentionUNet(in_channels=in_channels, out_channels=out_channels)
     else:
-        network = NestedUNet(in_channels=in_channels, out_channels=out_channels)
+        ...  # TODO @Lakoc
+        # network = TransUNet()
 
     if weights_path is not None:
         if torch.cuda.is_available():
