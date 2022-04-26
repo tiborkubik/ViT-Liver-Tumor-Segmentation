@@ -25,7 +25,7 @@ conda create -n ViT-Liver-Tumor-Segmentation python=3.9.7
 conda activate ViT-Liver-Tumor-Segmentation
 
 echo "ENV created. $(date +"%T") Installing requirements ..."
-pip install -r requirements.txt
+pip install -r "$SCRATCHDIR/requirements.txt"
 echo "All packages installed. $(date +"%T")"
 
 echo "Copying data from FE: $(date +"%T").."
