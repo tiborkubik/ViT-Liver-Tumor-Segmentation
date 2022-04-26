@@ -86,7 +86,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = parse_args()
 
-    network = create_model(args.network_name, args.training_mode)
+    network = create_model(args.network_name, training_mode=args.training_mode)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     network.to(device)

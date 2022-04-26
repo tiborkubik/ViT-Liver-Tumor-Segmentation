@@ -127,8 +127,7 @@ class LiverTumorDataset(Dataset):
                           interpolation=cv2.INTER_AREA)
 
         sample = {
-            # 'images': torch.tensor(normalize_slice(slice)),
-            'images': images,
+            'images': torch.tensor(images),
             'masks_liver': (mask == 1.0).astype(float),
             'masks_tumor': (mask == 2.0).astype(float),
         }

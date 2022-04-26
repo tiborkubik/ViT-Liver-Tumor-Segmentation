@@ -42,7 +42,7 @@ class Evaluator:
                 predictions = self.model(inputs)
 
                 preds_liver = predictions[:, 0, :, :]
-                preds_lesion = predictions[:, 0, :, :]
+                preds_lesion = predictions[:, 1, :, :]
 
                 masks_reshaped = torch.reshape(masks, predictions.size())
                 masks_liver = masks_reshaped[:, 0, :, :]
@@ -162,7 +162,7 @@ def write_metrics(filename: str, type: str, metrics: List[VolumeMetric]):
 
 if __name__ == "__main__":
     args = parse_args()
-    model = create_model(args.network_name, args.weights)
+    model = create_model(args.network_name, weights_path=args.weights, training_mode='2D')
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
