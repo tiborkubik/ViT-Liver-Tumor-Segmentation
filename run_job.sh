@@ -21,7 +21,7 @@ cp -r "$DATADIR/environment.yml" "$SCRATCHDIR" || {
 }
 
 module add conda-modules-py37
-conda env create -f environment.yml
+conda env create -f "$SCRATCHDIR/environment.yml"
 conda activate ViT-Liver-Tumor-Segmentation
 
 echo "ENV created. $(date +"%T")"
