@@ -16,19 +16,21 @@ from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
 
 class Evaluator:
 
-    def __init__(self, dataset_path, model, device, metrics: List[VolumeMetric]):
+    def __init__(self, dataset_path, model, device, liver_metrics: List[VolumeMetric],
+                 lesion_metrics: List[VolumeMetric]):
         self.dataset_path = dataset_path
         self.model = model
         self.device = device
-        self.metrics = metrics
+        self.liver_metrics = liver_metrics
+        self.lesion_metrics = lesion_metrics
         self.dataset = LiverTumorDataset(dataset_path=dataset_path)
 
     def evaluate(self, volumes=None):
         if volumes is None:
             volumes = len(self.dataset)
 
-        for metric in self.metrics:
-            metric.reset()
+        self.reset_metrics(self.liver_metrics)
+        self.reset_metrics(self.lesion_metrics)
 
         self.model.eval()
         loop = tqdm(self.dataset, total=volumes, desc="Evaluation")
@@ -45,8 +47,21 @@ class Evaluator:
                 predictions = self.model(inputs_batch)
                 masks_reshaped = torch.reshape(masks, predictions.size())
 
-                for metric in self.metrics:
-                    metric.update(predictions, masks_reshaped, vol_idx)
+                preds_liver = predictions[:, 0, :, :]
+                preds_lesion = predictions[:, 0, :, :]
+
+                masks_liver = masks_reshaped[:, 0, :, :]
+                masks_lesion = masks_reshaped[:, 1, :, :]
+
+                for metric in self.liver_metrics:
+                    metric.update(preds_liver, masks_liver, vol_idx)
+
+                for metric in self.lesion_metrics:
+                    metric.update(preds_lesion, masks_lesion, vol_idx)
+
+    def reset_metrics(self, metrics):
+        for metric in metrics:
+            metric.reset()
 
     def create_nii(self, volume_idx: int, save_path: str) -> None:
         volume_path = os.path.join(self.dataset_path, 'vols-3d', F"volume-{volume_idx}.nii")
@@ -93,7 +108,8 @@ class Evaluator:
         normalized_slice = normalize_slice(resized_slice)
         return normalized_slice
 
-    def _postprocesses_mask(self, pred_mask: np.ndarray, new_size: Tuple, threshold: float) -> Tuple[np.ndarray, np.ndarray]:
+    def _postprocesses_mask(self, pred_mask: np.ndarray, new_size: Tuple, threshold: float) -> Tuple[
+        np.ndarray, np.ndarray]:
         binarized_mask = (pred_mask > threshold).astype(np.float32)
         liver_mask = binarized_mask[0]
         tumor_mask = binarized_mask[1]
@@ -126,12 +142,17 @@ if __name__ == "__main__":
     model = create_model(args.network_name, args.weights)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-    dice_metric = DicePerVolume()
-    metrics = [dice_metric]
-    evaluator = Evaluator(args.dataset, model, device, metrics)
 
-    # evaluator.evaluate()
-    # print('Per volume dice score:', dice_metric.compute_per_volume())
-    # print('Dice score:', dice_metric.compute_total())
+    liver_metrics = [DicePerVolume()]
+    lesion_metrics = [DicePerVolume()]
+    evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics)
 
-    evaluator.create_nii(0, 'dataset/predictions')
+    evaluator.evaluate()
+    print('Liver')
+    print('Per volume dice score:', liver_metrics[0].compute_per_volume())
+    print('Dice score:', liver_metrics[0].compute_total())
+    print('Lesion')
+    print('Per volume dice score:', lesion_metrics[0].compute_per_volume())
+    print('Dice score:', lesion_metrics[0].compute_total())
+
+    # evaluator.create_nii(0, 'dataset/predictions')
