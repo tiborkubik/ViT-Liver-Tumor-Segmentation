@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, VOE, VolumeMetric
+from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, RAVD, VOE, VolumeMetric
 from src.networks.utils import create_model
 from src.trainer import config
 from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
@@ -151,19 +151,28 @@ def print_metrics(type: str, metrics: List[VolumeMetric]):
     print()
 
 
+def write_metrics(filename: str, type: str, metrics: List[VolumeMetric]):
+    with open(filename, "a") as file:
+        file.write(type)
+        file.write("\n")
+
+        for metric in metrics:
+            file.write(F"{metric.name}: {metric.compute_total()}\n")
+
+
 if __name__ == "__main__":
     args = parse_args()
     model = create_model(args.network_name, args.weights)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-    liver_metrics = [DicePerVolume(), VOE(), ASSD(), MSD()]
-    lesion_metrics = [DicePerVolume(), VOE(), ASSD(), MSD()]
+    liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
+    lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
     evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics)
 
     evaluator.evaluate()
 
-    print_metrics('Liver', liver_metrics)
-    print_metrics('Lesion', lesion_metrics)
+    write_metrics('metrics.log', 'Liver', liver_metrics)
+    write_metrics('metrics.log', 'Lesion', lesion_metrics)
 
     # evaluator.create_nii(0, 'dataset/predictions')
