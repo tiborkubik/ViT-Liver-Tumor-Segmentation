@@ -19,6 +19,8 @@ import logging
 import argparse
 
 import src.trainer.config as config
+from src.evaluation.evaluator import Evaluator
+from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, RAVD, VOE
 from src.networks.UNet import UNet
 from src.networks.utils import create_model
 from src.trainer.Trainer import Trainer
@@ -85,26 +87,31 @@ if __name__ == '__main__':
     logging.info(f'GPU name: {torch.cuda.get_device_name(0)}')
     logging.info(f'Training the weights of {args.network_name}')
 
-    try:
-        trainer = Trainer(network=network,
-                          network_name=args.network_name,
-                          device=device,
-                          dataset_train=args.dataset_train,
-                          dataset_val=args.dataset_val,
-                          epochs=args.epochs,
-                          batch_size=args.batch_size,
-                          weight_decay=args.weight_decay,
-                          betas=args.betas,
-                          adam_w_eps=args.adam_w_eps,
-                          early_stopping=args.early_stopping,
-                          lr=args.lr,
-                          lr_scheduler_patience=args.lr_scheduler_patience,
-                          lr_scheduler_min_lr=args.lr_scheduler_min_lr,
-                          lr_scheduler_factor=args.lr_scheduler_factor,
-                          w_liver=args.w_liver,
-                          w_tumor=args.w_tumor)
+    trainer = Trainer(network=network,
+                      network_name=args.network_name,
+                      device=device,
+                      dataset_train=args.dataset_train,
+                      dataset_val=args.dataset_val,
+                      epochs=args.epochs,
+                      batch_size=args.batch_size,
+                      weight_decay=args.weight_decay,
+                      betas=args.betas,
+                      adam_w_eps=args.adam_w_eps,
+                      early_stopping=args.early_stopping,
+                      lr=args.lr,
+                      lr_scheduler_patience=args.lr_scheduler_patience,
+                      lr_scheduler_min_lr=args.lr_scheduler_min_lr,
+                      lr_scheduler_factor=args.lr_scheduler_factor,
+                      w_liver=args.w_liver,
+                      w_tumor=args.w_tumor)
 
+    try:
         trainer.training()
+
+        liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
+        lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
+        evaluator = Evaluator(args.dataset_val, network, device, liver_metrics, lesion_metrics)
+        evaluator.evaluate()
 
     except KeyboardInterrupt:
         torch.save(network.state_dict(), 'interrupted_model.pt')
