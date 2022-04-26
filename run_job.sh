@@ -71,6 +71,8 @@ python "$SCRATCHDIR/src/preprocess/preprocess_niis.py" -dp "$SCRATCHDIR/data/val
 echo "Slicing done: $(date +"%T")"
 
 # Start training
+mkdir "$SCRATCHDIR/trained-weights"
+mkdir "$SCRATCHDIR/documentation"
 echo "All ready. Starting trainer: $(date +"%T")"
 python3 "$SCRATCHDIR/src/trainer/train.py" -dt data/train -dv data/val/ -tm 2D -b 64 -e 2
 
