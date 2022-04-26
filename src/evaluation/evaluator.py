@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from src.evaluation.metrics.DicePerVolume import DicePerVolume, VolumeMetric
+from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, VOE, VolumeMetric
 from src.networks.utils import create_model
 from src.trainer import config
 from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
@@ -29,39 +29,43 @@ class Evaluator:
         if volumes is None:
             volumes = len(self.dataset)
 
-        self.reset_metrics(self.liver_metrics)
-        self.reset_metrics(self.lesion_metrics)
+        self._reset_metrics(self.liver_metrics)
+        self._reset_metrics(self.lesion_metrics)
 
         self.model.eval()
         loop = tqdm(self.dataset, total=volumes, desc="Evaluation")
 
         with torch.no_grad():
             for i_batch, sample in enumerate(loop):
-                inputs = sample['images'].type(torch.FloatTensor).to(self.device)
-                masks = sample['masks'].type(torch.FloatTensor).to(self.device)
-                vol_idx = sample['vol_idx']
+                inputs, masks, vol_idx = self._prepare_sample(sample)
 
-                # Add batch and channel dimension
-                inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
-                # Forward
-                predictions = self.model(inputs_batch)
-                masks_reshaped = torch.reshape(masks, predictions.size())
+                predictions = self.model(inputs)
 
                 preds_liver = predictions[:, 0, :, :]
                 preds_lesion = predictions[:, 0, :, :]
 
+                masks_reshaped = torch.reshape(masks, predictions.size())
                 masks_liver = masks_reshaped[:, 0, :, :]
                 masks_lesion = masks_reshaped[:, 1, :, :]
 
-                for metric in self.liver_metrics:
-                    metric.update(preds_liver, masks_liver, vol_idx)
+                self._update_metrics(self.liver_metrics, preds_liver, masks_liver, vol_idx)
+                self._update_metrics(self.lesion_metrics, preds_lesion, masks_lesion, vol_idx)
 
-                for metric in self.lesion_metrics:
-                    metric.update(preds_lesion, masks_lesion, vol_idx)
+    def _prepare_sample(self, sample):
+        inputs = sample['images'].type(torch.FloatTensor).to(self.device)
+        masks = sample['masks'].type(torch.FloatTensor).to(self.device)
+        vol_idx = sample['vol_idx']
+        # Add batch and channel dimension
+        inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
+        return inputs_batch, masks, vol_idx
 
-    def reset_metrics(self, metrics):
+    def _reset_metrics(self, metrics):
         for metric in metrics:
             metric.reset()
+
+    def _update_metrics(self, metrics, preds, masks, vol_idx):
+        for metric in metrics:
+            metric.update(preds, masks, vol_idx)
 
     def create_nii(self, volume_idx: int, save_path: str) -> None:
         volume_path = os.path.join(self.dataset_path, 'vols-3d', F"volume-{volume_idx}.nii")
@@ -137,22 +141,29 @@ def parse_args():
     return args
 
 
+def print_metrics(type: str, metrics: List[VolumeMetric]):
+    print(type)
+    print("==========================")
+
+    for metric in metrics:
+        print(F"{metric.name}: {metric.compute_total()}")
+
+    print()
+
+
 if __name__ == "__main__":
     args = parse_args()
     model = create_model(args.network_name, args.weights)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-    liver_metrics = [DicePerVolume()]
-    lesion_metrics = [DicePerVolume()]
+    liver_metrics = [DicePerVolume(), VOE(), ASSD(), MSD()]
+    lesion_metrics = [DicePerVolume(), VOE(), ASSD(), MSD()]
     evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics)
 
     evaluator.evaluate()
-    print('Liver')
-    print('Per volume dice score:', liver_metrics[0].compute_per_volume())
-    print('Dice score:', liver_metrics[0].compute_total())
-    print('Lesion')
-    print('Per volume dice score:', lesion_metrics[0].compute_per_volume())
-    print('Dice score:', lesion_metrics[0].compute_total())
+
+    print_metrics('Liver', liver_metrics)
+    print_metrics('Lesion', lesion_metrics)
 
     # evaluator.create_nii(0, 'dataset/predictions')
