@@ -46,8 +46,8 @@ cp -r "$DATADIR/src" "$SCRATCHDIR/src" || {
 echo "Unzipping dataset: $(date +"%T")..."
 unzip "$SCRATCHDIR/data/Training_Batch1.zip" -d "$SCRATCHDIR/data/"
 unzip "$SCRATCHDIR/data/Training_Batch2.zip" -d "$SCRATCHDIR/data/"
-SUBDIR1="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 1"
-SUBDIR2="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 2"
+SUBDIR1="media/nas/01_Datasets/CT/LITS/Training Batch 1"
+SUBDIR2="media/nas/01_Datasets/CT/LITS/Training Batch 2"
 
 mkdir "$SCRATCHDIR/data/segs-3d"
 mkdir "$SCRATCHDIR/data/vols-3d"
@@ -62,7 +62,7 @@ echo "Unzipping done: $(date +"%T")"
 # Split dataset to train and validation part
 echo "Creating validation and train split: $(date +"%T")..."
 export PYTHONPATH=$SCRATCHDIR
-python src/preprocess/split_dataset.py -d "$SCRATCHDIR/data"
+python "$SCRATCHDIR/src/preprocess/split_dataset.py" -d "$SCRATCHDIR/data"
 
 echo "Splits successfully created: $(date +"%T")"
 
@@ -76,7 +76,7 @@ echo "Slicing done: $(date +"%T")"
 mkdir "$SCRATCHDIR/trained-weights"
 mkdir "$SCRATCHDIR/documentation"
 echo "All ready. Starting trainer: $(date +"%T")"
-python3 "$SCRATCHDIR/src/trainer/train.py" -dt data/train -dv data/val/ -tm 2D -b 64 -e 2
+python3 "$SCRATCHDIR/src/trainer/train.py" -dt data/train -dv data/val/ -tm 2D -b 64
 
 echo "Cleaning environment: $(date +"%T")"
 conda deactivate
