@@ -44,8 +44,8 @@ cp -r "$DATADIR/src" "$SCRATCHDIR/src" || {
 
 # Unzip dataset and split to seg, vol folders
 echo "Unzipping dataset: $(date +"%T")..."
-unzip "$SCRATCHDIR/data/Training_Batch1.zip"
-unzip "$SCRATCHDIR/data/Training_Batch2.zip"
+unzip "$SCRATCHDIR/data/Training_Batch1.zip" -d "$SCRATCHDIR/data/"
+unzip "$SCRATCHDIR/data/Training_Batch2.zip" -d "$SCRATCHDIR/data/"
 SUBDIR1="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 1"
 SUBDIR2="media/nas/01_Datasets/CT/LITS/Training\ Batch\ 2"
 
