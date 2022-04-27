@@ -40,7 +40,8 @@ class Trainer:
 
     def __init__(self, network, network_name, training_mode, device, dataset_train, dataset_val,
                  epochs, batch_size, loss, weight_decay, betas, adam_w_eps,
-                 early_stopping, lr, lr_scheduler_patience, lr_scheduler_min_lr, lr_scheduler_factor, w_liver, w_tumor):
+                 early_stopping, lr, lr_scheduler_patience, lr_scheduler_min_lr, lr_scheduler_factor, w_liver, w_tumor,
+                 save_prefix):
 
         self.network = network
         self.network_name = network_name
@@ -48,6 +49,7 @@ class Trainer:
         self.device = device
         self.dataset_train = dataset_train
         self.dataset_val = dataset_val
+        self.save_prefix = save_prefix
 
         self.epochs = epochs
         self.batch_size = batch_size
@@ -102,7 +104,8 @@ class Trainer:
                                                                transforms_mask=T.Compose(transforms[:-2]))
 
         if self.early_stopping_flag:
-            model_prefix = os.path.join('trained-weights', self.network_name)
+
+            model_prefix = os.path.join(self.save_prefix, 'trained-weights', self.network_name)
             if not os.path.exists(model_prefix):
                 os.makedirs(model_prefix)
             self.early_stopping = EarlyStopping(patience=config.HYPERPARAMETERS['early_stopping_patience'],
@@ -149,13 +152,13 @@ class Trainer:
 
             plt.plot(self.training_loss_list)
             plt.plot(self.validation_loss_list)
-            plt.savefig(f'documentation/loss-{epoch}.png')
+            plt.savefig(os.path.join(self.save_prefix, 'documentation', F'loss-{epoch}.png'))
 
             if self.early_stopping_flag and self.stop_flag:  # We are overfitting, let's end training...
                 break
 
         # Load weights from checkpoint: those are the best ones before overfitting.
-        model_prefix = os.path.join('trained-weights', self.network_name)
+        model_prefix = os.path.join(self.save_prefix, 'trained-weights', self.network_name)
         self.network.load_state_dict(torch.load(os.path.join(model_prefix, 'best-weights.pt')))
 
         name = self.training_run_id + f'-{self.network_name}.pt'

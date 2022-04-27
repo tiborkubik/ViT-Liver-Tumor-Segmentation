@@ -76,7 +76,7 @@ echo "Slicing done: $(date +"%T")"
 mkdir "$SCRATCHDIR/trained-weights"
 mkdir "$SCRATCHDIR/documentation"
 echo "All ready. Starting trainer: $(date +"%T")"
-python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -tm 2D
+python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -tm 2D -sp $SCRATCHDIR
 
 echo "Cleaning environment: $(date +"%T")"
 conda deactivate

@@ -14,10 +14,12 @@
     This file was created as a part of project called 'Visual Transformers for Liver and Liver Tumor Segmentation from
     CT Scans of Human Abdomens' for KNN/2021L course.
 """
+import os.path
+
 import torch
 import logging
 import argparse
-
+import sys
 import src.trainer.config as config
 from src.evaluation.evaluator import Evaluator
 from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, RAVD, VOE
@@ -25,6 +27,8 @@ from src.networks.UNet import UNet
 from src.networks.utils import create_model
 from src.trainer.Trainer import Trainer
 from src.networks.AttentionUNet import AttentionUNet
+
+
 # from src.networks.TransUNet import TransUNet
 
 
@@ -37,7 +41,8 @@ def parse_args():
     parser.add_argument('-dv', '--dataset-val', metavar='D', type=str,
                         default=None, help='Path to 2D slices w. val slices.', dest='dataset_val')
     parser.add_argument('-tm', '--training-mode', metavar='TM', type=str,
-                        default=config.HYPERPARAMETERS['training_mode'], help='2D or 2.5D training...', dest='training_mode')
+                        default=config.HYPERPARAMETERS['training_mode'], help='2D or 2.5D training...',
+                        dest='training_mode')
     parser.add_argument('-e', '--epochs', metavar='E', type=int,
                         default=config.HYPERPARAMETERS['epochs'], help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?',
@@ -49,15 +54,19 @@ def parse_args():
     parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?',
                         default=config.HYPERPARAMETERS['learning_rate'], help='Learning rate', dest='lr')
     parser.add_argument('-bt', '--betas', metavar='BT', type=float, nargs='?',
-                        default=config.HYPERPARAMETERS['betas'], help='Coefficients used for computing running averages of gradient and its square.', dest='betas')
+                        default=config.HYPERPARAMETERS['betas'],
+                        help='Coefficients used for computing running averages of gradient and its square.',
+                        dest='betas')
     parser.add_argument('-p', '--eps', metavar='EP', type=float, nargs='?',
-                        default=config.HYPERPARAMETERS['adam_w_eps'], help='Term added to the denominator to improve numerical stability.', dest='adam_w_eps')
+                        default=config.HYPERPARAMETERS['adam_w_eps'],
+                        help='Term added to the denominator to improve numerical stability.', dest='adam_w_eps')
     parser.add_argument('-n', '--network-name', metavar='NN', type=str,
                         default=config.HYPERPARAMETERS['network'], help='Network name', dest='network_name')
     parser.add_argument('-s', '--early-stopping', metavar='ES', type=bool,
                         default=True, help='Apply early stopping', dest='early_stopping')
     parser.add_argument('-lp', '--lr-patience', metavar='LP', type=float,
-                        default=config.HYPERPARAMETERS['lr_scheduler_patience'], help='Lr patience', dest='lr_scheduler_patience')
+                        default=config.HYPERPARAMETERS['lr_scheduler_patience'], help='Lr patience',
+                        dest='lr_scheduler_patience')
     parser.add_argument('-lm', '--lr-min', metavar='LM', type=float,
                         default=config.HYPERPARAMETERS['lr_scheduler_min_lr'], help='Minimal lr value',
                         dest='lr_scheduler_min_lr')
@@ -70,6 +79,9 @@ def parse_args():
     parser.add_argument('-wt', '--weight-tumor', metavar='WT', type=float,
                         default=config.HYPERPARAMETERS['w_tumor'], help='Weight of Tumor in training',
                         dest='w_tumor')
+    parser.add_argument('-sp', '--save-prefix', metavar='SP', type=str,
+                        default="", help='Prefix of path to save outputs',
+                        dest='s_prefix')
     args = parser.parse_args()
 
     assert args.dataset_train is not None
@@ -113,7 +125,7 @@ if __name__ == '__main__':
                       lr_scheduler_min_lr=args.lr_scheduler_min_lr,
                       lr_scheduler_factor=args.lr_scheduler_factor,
                       w_liver=args.w_liver,
-                      w_tumor=args.w_tumor)
+                      w_tumor=args.w_tumor, save_prefix=args.s_prefix)
 
     try:
         trainer.training()
@@ -124,4 +136,4 @@ if __name__ == '__main__':
         evaluator.evaluate()
 
     except KeyboardInterrupt:
-        torch.save(network.state_dict(), 'interrupted_model.pt')
+        torch.save(network.state_dict(), os.path.join(args.s_prefix, 'interrupted_model.pt'))
