@@ -12,6 +12,7 @@ from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, RAVD,
 from src.networks.utils import create_model
 from src.trainer import config
 from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
+from src.evaluation.utils import write_metrics
 
 
 class Evaluator:
@@ -139,25 +140,6 @@ def parse_args():
     assert args.network_name in ['UNet', 'AttentionUNet', 'TransUNet']
 
     return args
-
-
-def print_metrics(type: str, metrics: List[VolumeMetric]):
-    print(type)
-    print("==========================")
-
-    for metric in metrics:
-        print(F"{metric.name}: {metric.compute_total()}")
-
-    print()
-
-
-def write_metrics(filename: str, type: str, metrics: List[VolumeMetric]):
-    with open(filename, "a") as file:
-        file.write(type)
-        file.write("\n")
-
-        for metric in metrics:
-            file.write(F"{metric.name}: {metric.compute_total()}\n")
 
 
 if __name__ == "__main__":

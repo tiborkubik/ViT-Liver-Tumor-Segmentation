@@ -19,17 +19,12 @@ import os.path
 import torch
 import logging
 import argparse
-import sys
 import src.trainer.config as config
 from src.evaluation.evaluator import Evaluator
 from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, RAVD, VOE
-from src.networks.UNet import UNet
 from src.networks.utils import create_model
 from src.trainer.Trainer import Trainer
-from src.networks.AttentionUNet import AttentionUNet
-
-
-# from src.networks.TransUNet import TransUNet
+from src.evaluation.utils import write_metrics
 
 
 def parse_args():
@@ -134,6 +129,9 @@ if __name__ == '__main__':
         lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
         evaluator = Evaluator(args.dataset_val, network, device, liver_metrics, lesion_metrics)
         evaluator.evaluate()
+        metrics_path = os.path.join(args.s_prefix, 'metrics.log')
+        write_metrics(metrics_path, 'Liver', liver_metrics)
+        write_metrics(metrics_path, 'Lesion', lesion_metrics)
 
     except KeyboardInterrupt:
         torch.save(network.state_dict(), os.path.join(args.s_prefix, 'interrupted_model.pt'))
