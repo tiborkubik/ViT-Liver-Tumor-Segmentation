@@ -27,11 +27,8 @@ class DiceLoss(nn.Module):
     def forward(self, inputs, targets, smooth=1):
         inputs = torch.sigmoid(inputs)
 
-        # flatten label and prediction tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
+        dims = (1, 2, 3)
+        intersection = (inputs * targets).sum(axis=dims)
+        dice = (2. * intersection + smooth) / (inputs.sum(axis=dims) + targets.sum(axis=dims) + smooth)
 
-        intersection = (inputs * targets).sum()
-        dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
-
-        return 1 - dice
+        return torch.mean(1 - dice)
