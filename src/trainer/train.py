@@ -77,6 +77,9 @@ def parse_args():
     parser.add_argument('-sp', '--save-prefix', metavar='SP', type=str,
                         default="", help='Prefix of path to save outputs',
                         dest='s_prefix')
+    parser.add_argument('-vw', '--vit_weights', metavar='VW', type=str, dest='v_weights',
+                        default="",
+                        help='Pretrained vision transformer model weights')
     args = parser.parse_args()
 
     assert args.dataset_train is not None
@@ -93,7 +96,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = parse_args()
 
-    network = create_model(args.network_name, training_mode=args.training_mode)
+    network = create_model(args.network_name, training_mode=args.training_mode, vit_weights_path=args.v_weights)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     network.to(device)

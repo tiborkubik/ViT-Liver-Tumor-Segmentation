@@ -45,5 +45,11 @@ DIMENSIONS = {
     'output_net': 128
 }
 
+'''Vit settings'''
+VIT = {
+    'model_name': 'R50-ViT-B_16',
+    'patches_size': 16
+}
+
 TYPICAL_LIVER_WW = 150
 TYPICAL_LIVER_WL = 30
