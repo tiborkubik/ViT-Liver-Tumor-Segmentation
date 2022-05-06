@@ -1,14 +1,18 @@
 #!/bin/bash
-#PBS -N ViT-Liver-Tumor-Segmentation
+#PBS -N ViT-Liver-Tumor-Segmentation-2D-AUNET
 #PBS -q gpu
 #PBS -l select=1:ngpus=1:gpu_cap=cuda75:cl_adan=True:mem=32gb:scratch_local=100gb
 #PBS -l walltime=24:00:00
 #PBS -m abe
 
+find_in_conda_env() {
+  conda env list | grep "${@}" >/dev/null 2>/dev/null
+}
+
 # Clean up after exit
 trap 'clean_scratch' EXIT
 
-JOB_ID="2D_TEST"
+JOB_ID="2D-AUNET"
 DATADIR=/storage/brno2/home/lakoc/ViT-Liver-Tumor-Segmentation
 
 echo "$PBS_JOBID is running on node $(hostname -f) in a scratch directory $SCRATCHDIR: $(date +"%T")"
@@ -21,7 +25,11 @@ cp -r "$DATADIR/requirements.txt" "$SCRATCHDIR" || {
 }
 
 module add conda-modules-py37
-conda create -n ViT-Liver-Tumor-Segmentation python=3.9.7
+
+if ! find_in_conda_env "ViT-Liver-Tumor-Segmentation"; then
+  conda create -n ViT-Liver-Tumor-Segmentation python=3.9.7
+fi
+
 conda activate ViT-Liver-Tumor-Segmentation
 
 echo "ENV created. $(date +"%T") Installing requirements ..."
@@ -76,13 +84,13 @@ echo "Slicing done: $(date +"%T")"
 mkdir "$SCRATCHDIR/trained-weights"
 mkdir "$SCRATCHDIR/documentation"
 echo "All ready. Starting trainer: $(date +"%T")"
-python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -tm 2D -sp $SCRATCHDIR
+python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -tm 2D -sp $SCRATCHDIR -n AttentionUNet -lo MSE
 
 echo "Cleaning environment: $(date +"%T")"
 conda deactivate
-conda env remove -n ViT-Liver-Tumor-Segmentation --yes
 
 echo "Training done. Copying back to FE: $(date +"%T")"
+mkdir "$DATADIR/$JOB_ID"
 # Copy data back to FE
 cp -r "$SCRATCHDIR/documentation" "$DATADIR/$JOB_ID" || {
   echo >&2 "Couldnt copy documentation to datadir."
