@@ -107,3 +107,5 @@ cp -r "$SCRATCHDIR/metrics.log" "$DATADIR/$JOB_ID" || {
   echo >&2 "Couldnt copy metrics log."
   exit 3
 }
+
+clean_scratch
