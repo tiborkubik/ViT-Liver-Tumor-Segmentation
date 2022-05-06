@@ -48,7 +48,8 @@ DIMENSIONS = {
 '''Vit settings'''
 VIT = {
     'model_name': 'R50-ViT-B_16',
-    'patches_size': 16
+    'patches_size': 16,
+    'in_channels': 3
 }
 
 TYPICAL_LIVER_WW = 150

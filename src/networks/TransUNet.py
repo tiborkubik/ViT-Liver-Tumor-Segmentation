@@ -40,7 +40,8 @@ class TransUNet(nn.Module):
         if vit_model.find('R50') != -1:
             config_vit.patches.grid = (int(img_size / vit_patches_size), int(img_size / vit_patches_size))
         self.net = vit_seg.VisionTransformer(config_vit, img_size=img_size, num_classes=config_vit.n_classes).cuda()
-        self.net.load_from(weights=np.load(weights))
+        if weights:
+            self.net.load_from(weights=np.load(weights))
 
     def forward(self, image):
         return self.net.forward(image)
