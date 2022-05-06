@@ -10,7 +10,7 @@ find_in_conda_env() {
 }
 
 # Clean up after exit
-trap 'clean_scratch' EXIT
+#trap 'clean_scratch' EXIT
 
 JOB_ID="2D_UNET"
 DATADIR=/storage/brno2/home/lakoc/ViT-Liver-Tumor-Segmentation
