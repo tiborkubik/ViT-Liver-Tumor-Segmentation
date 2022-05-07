@@ -107,6 +107,9 @@ class Evaluator:
         liver_slices = np.stack(liver_masks, -1)
         tumor_slices = np.stack(tumor_masks, -1)
 
+        # Tumor should be indicated by value 2
+        tumor_slices *= 2
+
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
