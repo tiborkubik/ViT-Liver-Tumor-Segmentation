@@ -203,8 +203,7 @@ def get_dataset_loader(dataset_path, transforms_img=None, transforms_mask=None, 
         -   It creates the sampler instances (if needed) and the loaders itself.
             The returned loaders are inherited from torch Data Loaders, so they can be directly used in training loop.
 
-    :param train_path: Path to the dataset of TRAINING part only!
-    :param val_path: Path to the dataset of VALIDATION part only!
+    :param dataset_path: Path to the dataset
     :param transforms_img: Transforms applied on training images.
     :param transforms_mask: Transforms applied only on the masks.
     :param batch_size: Training batch size.
