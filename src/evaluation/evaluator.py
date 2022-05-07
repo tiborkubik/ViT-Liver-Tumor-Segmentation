@@ -51,6 +51,11 @@ class Evaluator:
                 masks_liver = masks_reshaped[:, 0, :, :]
                 masks_lesion = masks_reshaped[:, 1, :, :]
 
+                preds_liver = preds_liver.cpu()
+                preds_lesion = preds_lesion.cpu()
+                masks_liver = masks_liver.cpu()
+                masks_lesion = masks_lesion.cpu()
+
                 self._update_metrics(self.liver_metrics, preds_liver, masks_liver, vol_idx)
                 self._update_metrics(self.lesion_metrics, preds_lesion, masks_lesion, vol_idx)
 

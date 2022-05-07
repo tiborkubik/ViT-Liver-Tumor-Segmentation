@@ -83,17 +83,18 @@ class LiverTumorDataset(Dataset):
             neighbors_lower_z = []
             neighbors_higher_z = []
 
-            filename, _ = os.path.splitext(self.slices[item][0])
-            slice_num = int(filename.split('-')[-1])
-            vol_num = int(filename.split('-')[-2])
-            vol_name = filename.split('-')[0] + '-' + filename.split('-')[1]
+            filename, extension = os.path.splitext(self.slices[item][0])
+            volumes_prefix, volume_details = filename.split('volume')
+            slice_num = int(volume_details.split('-')[-1])
+            vol_num = int(volume_details.split('-')[-2])
+            vol_name = volumes_prefix + 'volume'
             # Check if there are any neighbouring slices with lower z-value. Repeat slice of interest otherwise.
             if slice_num < 4:
                 for i in range(0, 4):
                     neighbors_lower_z.append(slice_of_interest)
             else:
                 for i in range(4, 0, -1):
-                    slice = cv2.imread(vol_name + '-' + str(vol_num) + '-' + str(slice_num - i) + '.png',
+                    slice = cv2.imread(vol_name + '-' + str(vol_num) + '-' + str(slice_num - i) + extension,
                                        cv2.IMREAD_GRAYSCALE)
                     slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
                                        interpolation=cv2.INTER_AREA)
@@ -102,8 +103,8 @@ class LiverTumorDataset(Dataset):
 
             # Check if there are any neighboring slices with higher z-value. Repeat slice of interest otherwise.
             for i in range(1, 5):
-                if os.path.exists(vol_name + '-' + str(vol_num) + '-' + str(slice_num + i) + '.png'):
-                    slice = cv2.imread(vol_name + '-' + str(vol_num) + '-' + str(slice_num + i) + '.png',
+                if os.path.exists(vol_name + '-' + str(vol_num) + '-' + str(slice_num + i) + extension):
+                    slice = cv2.imread(vol_name + '-' + str(vol_num) + '-' + str(slice_num + i) + extension,
                                        cv2.IMREAD_GRAYSCALE)
                     slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
                                        interpolation=cv2.INTER_AREA)

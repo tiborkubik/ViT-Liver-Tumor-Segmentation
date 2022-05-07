@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -N ViT-Liver-Tumor-Segmentation-2D-AUNET
+#PBS -N ViT-Liver-Tumor-Segmentation-2D-UNET
 #PBS -q gpu
 #PBS -l select=1:ngpus=1:gpu_cap=cuda75:cl_adan=True:mem=32gb:scratch_local=100gb
 #PBS -l walltime=24:00:00
@@ -10,9 +10,9 @@ find_in_conda_env() {
 }
 
 # Clean up after exit
-trap 'clean_scratch' EXIT
+#trap 'clean_scratch' EXIT
 
-JOB_ID="2D-AUNET"
+JOB_ID="2D_UNET"
 DATADIR=/storage/brno2/home/lakoc/ViT-Liver-Tumor-Segmentation
 
 echo "$PBS_JOBID is running on node $(hostname -f) in a scratch directory $SCRATCHDIR: $(date +"%T")"
@@ -84,7 +84,9 @@ echo "Slicing done: $(date +"%T")"
 mkdir "$SCRATCHDIR/trained-weights"
 mkdir "$SCRATCHDIR/documentation"
 echo "All ready. Starting trainer: $(date +"%T")"
-python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -tm 2D -sp $SCRATCHDIR -n AttentionUNet -lo MSE
+BACKBONE="$DATADIR/backbones/imagenet21k_R50+ViT-B_16.npz"
+
+python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -tm 2D -sp $SCRATCHDIR -e 2 -n UNet -lo MSE -vw $BACKBONE
 
 echo "Cleaning environment: $(date +"%T")"
 conda deactivate
@@ -105,3 +107,5 @@ cp -r "$SCRATCHDIR/metrics.log" "$DATADIR/$JOB_ID" || {
   echo >&2 "Couldnt copy metrics log."
   exit 3
 }
+
+clean_scratch
