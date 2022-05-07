@@ -13,16 +13,17 @@ class VolumeMetric(ABC):
         self.vols_counts = {}
 
     def update(self, pred_slice: torch.Tensor, target_slice: torch.Tensor, vol_idx: int):
-        if vol_idx not in self.vols_sum:
-            self.vols_sum[vol_idx] = torch.tensor(0, dtype=torch.float32)
-            self.vols_counts[vol_idx] = torch.tensor(0, dtype=torch.long)
-
         pred_slice = (pred_slice > self.pred_threshold).float()
         pred_slice_sum = torch.sum(pred_slice)
         target_slice_sum = torch.sum(target_slice)
 
         # Ignore slices where no object is present
         if pred_slice_sum > 0 and target_slice_sum > 0:
+            # Initialize contours if the current slice is the first slice of the volume
+            if vol_idx not in self.vols_sum:
+                self.vols_sum[vol_idx] = torch.tensor(0, dtype=torch.float32)
+                self.vols_counts[vol_idx] = torch.tensor(0, dtype=torch.long)
+
             dice_score = self.compute_metric(pred_slice, target_slice)
             self.vols_sum[vol_idx] += dice_score
             self.vols_counts[vol_idx] += 1
