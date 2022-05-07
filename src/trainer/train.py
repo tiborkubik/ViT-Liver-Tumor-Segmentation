@@ -21,7 +21,7 @@ import logging
 import argparse
 import src.trainer.config as config
 from src.evaluation.evaluator import Evaluator
-from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, RAVD, VOE
+from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE
 from src.networks.utils import create_model
 from src.trainer.Trainer import Trainer
 from src.evaluation.utils import write_metrics

@@ -1,5 +1,5 @@
 from typing import List
-from src.evaluation.metrics.DicePerVolume import VolumeMetric
+from src.evaluation.metrics import VolumeMetric
 
 
 def print_metrics(type: str, metrics: List[VolumeMetric]):

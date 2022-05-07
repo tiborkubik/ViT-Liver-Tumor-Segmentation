@@ -8,11 +8,10 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from src.evaluation.metrics.DicePerVolume import ASSD, DicePerVolume, MSD, RAVD, VOE, VolumeMetric
+from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE, VolumeMetric
 from src.networks.utils import create_model
 from src.trainer import config
 from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
-from src.evaluation.utils import write_metrics
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
