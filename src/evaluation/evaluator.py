@@ -1,7 +1,10 @@
 import argparse
-import os
-from typing import List, Tuple
+import glob
 import logging
+import os
+import zipfile
+from typing import List, Tuple
+
 import cv2
 import nibabel as nib
 import numpy as np
@@ -75,8 +78,7 @@ class Evaluator:
         for metric in metrics:
             metric.update(preds, masks, vol_idx)
 
-    def create_nii(self, volume_idx: int, save_path: str) -> None:
-        volume_path = os.path.join(self.dataset_path, 'vols-3d', F"volume-{volume_idx}.nii")
+    def create_nii(self, volume_path: str, save_path: str, volume_idx: int) -> None:
         volume_image = nib.load(volume_path)
         volume_data = volume_image.get_fdata()
         num_slices = volume_data.shape[2]
@@ -108,12 +110,12 @@ class Evaluator:
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
-        logging.debug(F"Created volume with liver slices: {liver_slices.shape}")
+        # logging.debug(F"Created volume with liver slices: {liver_slices.shape}")
         logging.debug(F"Created volume with tumor slices: {liver_slices.shape}")
         # Save as .nii files
-        liver_mask_path = os.path.join(save_path, f"segmentation_liver_{volume_idx}.nii")
-        tumor_mask_path = os.path.join(save_path, f"segmentation_tumor_{volume_idx}.nii")
-        nib.save(nib.Nifti1Image(liver_slices, affine=volume_image.affine), liver_mask_path)
+        # liver_mask_path = os.path.join(save_path, f"segmentation_liver_{volume_idx}.nii")
+        tumor_mask_path = os.path.join(save_path, f"test-segmentation-{volume_idx}.nii")
+        # nib.save(nib.Nifti1Image(liver_slices, affine=volume_image.affine), liver_mask_path)
         nib.save(nib.Nifti1Image(tumor_slices, affine=volume_image.affine), tumor_mask_path)
 
     def _prepare_slice(self, volume, slice_idx):
@@ -132,13 +134,32 @@ class Evaluator:
         resized_tumor_mask = cv2.resize(tumor_mask, new_size, interpolation=cv2.INTER_AREA)
         return resized_liver_mask, resized_tumor_mask
 
+    def generate_zip(self, save_dir: str, zip_name: str) -> None:
+        os.makedirs(args.zip_location, exist_ok=True)
+        vols_pattern = os.path.join(self.dataset_path, 'vols-3d', '*')
+        vol_file_paths = glob.glob(vols_pattern)
+        for volume_idx, volume_path in enumerate(vol_file_paths):
+            evaluator.create_nii(volume_path, save_dir, volume_idx)
+        self._save_files_to_zip(save_dir, zip_name)
+
+    def _save_files_to_zip(self, dir: str, zip_name: str):
+        vols_pattern = os.path.join(dir, '*.nii')
+        vol_files = glob.glob(vols_pattern)
+        zip_path = os.path.join(dir, zip_name)
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for vol_filepath in vol_files:
+                vol_filename = os.path.basename(vol_filepath)
+                zipf.write(vol_filepath, vol_filename)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Evaluation of Liver and Liver Tumor Segmentation from CT Scans of '
                                                  'Human Abdomens',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-d', '--dataset', metavar='D', type=str,
-                        default=None, help='Path to 2D slices')
+                        default=None, help='Path to 2D slices', required=True)
+    parser.add_argument('--zip-location', type=str,
+                        default='dataset/segmentations', help='Folder location of the output zip file')
     parser.add_argument('-w', '--weights', metavar='W', type=str,
                         default='trained_weights/UNet/03-25-18-49-14-UNet.pt', help='Trained model weights')
     parser.add_argument('-n', '--network-name', metavar='NN', type=str,
@@ -163,9 +184,11 @@ if __name__ == "__main__":
     lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
     evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics)
 
+    evaluator.generate_zip(args.zip_location, 'submission.zip')
+
     # evaluator.evaluate()
     #
     # write_metrics('metrics.log', 'Liver', liver_metrics)
     # write_metrics('metrics.log', 'Lesion', lesion_metrics)
 
-    evaluator.create_nii(0, 'dataset/predictions')
+    # evaluator.create_nii(0, 'dataset/predictions')
