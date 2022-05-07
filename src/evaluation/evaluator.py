@@ -1,7 +1,7 @@
 import argparse
 import os
 from typing import List, Tuple
-
+import logging
 import cv2
 import nibabel as nib
 import numpy as np
@@ -13,6 +13,9 @@ from src.networks.utils import create_model
 from src.trainer import config
 from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
 from src.evaluation.utils import write_metrics
+
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
 
 
 class Evaluator:
@@ -73,6 +76,7 @@ class Evaluator:
         volume_image = nib.load(volume_path)
         volume_data = volume_image.get_fdata()
         num_slices = volume_data.shape[2]
+        logging.debug(F"Volume shape: {volume_data.shape}")
 
         liver_masks = []
         tumor_masks = []
@@ -100,6 +104,8 @@ class Evaluator:
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
+        logging.debug(F"Created volume with liver slices: {liver_slices.shape}")
+        logging.debug(F"Created volume with tumor slices: {liver_slices.shape}")
         # Save as .nii files
         liver_mask_path = os.path.join(save_path, f"segmentation_liver_{volume_idx}.nii")
         tumor_mask_path = os.path.join(save_path, f"segmentation_tumor_{volume_idx}.nii")
@@ -143,6 +149,7 @@ def parse_args():
 
 
 if __name__ == "__main__":
+    logging.debug("message")
     args = parse_args()
     model = create_model(args.network_name, weights_path=args.weights, training_mode='2D')
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -152,9 +159,9 @@ if __name__ == "__main__":
     lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
     evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics)
 
-    evaluator.evaluate()
+    # evaluator.evaluate()
+    #
+    # write_metrics('metrics.log', 'Liver', liver_metrics)
+    # write_metrics('metrics.log', 'Lesion', lesion_metrics)
 
-    write_metrics('metrics.log', 'Liver', liver_metrics)
-    write_metrics('metrics.log', 'Lesion', lesion_metrics)
-
-    # evaluator.create_nii(0, 'dataset/predictions')
+    evaluator.create_nii(0, 'dataset/predictions')
