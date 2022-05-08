@@ -106,20 +106,25 @@ class Evaluator:
         # Stack all slices into a single array
         liver_slices = np.stack(liver_masks, -1)
         tumor_slices = np.stack(tumor_masks, -1)
-
-        # Tumor should be indicated by value 2
-        tumor_slices *= 2
+        slices = self._combine_liver_and_tumor_slices(liver_slices, tumor_slices)
 
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
-        # logging.debug(F"Created volume with liver slices: {liver_slices.shape}")
-        logging.debug(F"Created volume with tumor slices: {liver_slices.shape}")
+        logging.debug(F"Created segmentation volume with shape: {slices.shape}")
         # Save as .nii files
-        # liver_mask_path = os.path.join(save_path, f"segmentation_liver_{volume_idx}.nii")
-        tumor_mask_path = os.path.join(save_path, f"test-segmentation-{volume_idx}.nii")
-        # nib.save(nib.Nifti1Image(liver_slices, affine=volume_image.affine), liver_mask_path)
-        nib.save(nib.Nifti1Image(tumor_slices, affine=volume_image.affine), tumor_mask_path)
+        segmentation_path = os.path.join(save_path, f"test-segmentation-{volume_idx}.nii")
+        nib.save(nib.Nifti1Image(slices, affine=volume_image.affine), segmentation_path)
+
+    def _combine_liver_and_tumor_slices(self, liver_slices, tumor_slices):
+        # Tumor should be indicated by value 2
+        tumor_slices *= 2
+
+        # Combine volumes together
+        slices = liver_slices + tumor_slices
+        # Replace value 3 (liver + lesion) with 2 (lesion)
+        slices[slices > 2] = 2
+        return slices
 
     def _prepare_slice(self, volume, slice_idx):
         slice = volume[:, :, slice_idx]
