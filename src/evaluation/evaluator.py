@@ -15,7 +15,6 @@ from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE, VolumeMe
 from src.networks.utils import create_model
 from src.trainer import config
 from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
-from src.evaluation.utils import print_metrics
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -248,11 +247,11 @@ if __name__ == "__main__":
     evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics,
                           args.apply_masking, args.apply_morphological, args.kernel_liver, args.kernel_tumor)
 
-    # evaluator.generate_zip(args.zip_location, 'submission.zip')
+    evaluator.generate_zip(args.zip_location, 'submission.zip')
 
-    evaluator.evaluate()
-    #
-    print_metrics('Liver', liver_metrics)
-    print_metrics('Lesion', lesion_metrics)
+    # evaluator.evaluate()
+
+    # print_metrics('Liver', liver_metrics)
+    # print_metrics('Lesion', lesion_metrics)
 
     # evaluator.create_nii(0, 'dataset/predictions')
