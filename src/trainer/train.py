@@ -80,6 +80,19 @@ def parse_args():
     parser.add_argument('-vw', '--vit_weights', metavar='VW', type=str, dest='v_weights',
                         default="",
                         help='Pretrained vision transformer model weights')
+
+    ''' Evaluation post-processing. '''
+    parser.add_argument('-p1', '--postprocess-masking', metavar='P1', type=bool, default=False, dest='apply_masking',
+                        help='Apply a postprocessing, where the tumor parts detected out of the liver mask is not'
+                             'considered.')
+    parser.add_argument('-p2', '--postprocess-morphological', metavar='P2', type=bool, default=False,
+                        dest='apply_morphological', help='Apply morphological operations on detected masks to get rid'
+                                                         'of holes and noise.')
+    parser.add_argument('-kl', '--kernel-liver', metavar='KL', type=int, default=15,
+                        dest='kernel_liver', help='Size of kernel for morphological post-processing on liver.')
+    parser.add_argument('-kt', '--kernel-tumor', metavar='KT', type=int, default=3,
+                        dest='kernel_tumor', help='Size of kernel for morphological post-processing on tumor.')
+
     args = parser.parse_args()
 
     assert args.dataset_train is not None
@@ -130,8 +143,10 @@ if __name__ == '__main__':
 
         liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
         lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-        evaluator = Evaluator(args.dataset_val, network, device, liver_metrics, lesion_metrics)
+        evaluator = Evaluator(args.dataset_val, network, device, liver_metrics, lesion_metrics,
+                              args.apply_masking, args.apply_morphological, args.kernel_liver, args.kernel_tumor)
         evaluator.evaluate()
+
         metrics_path = os.path.join(args.s_prefix, 'metrics.log')
         write_metrics(metrics_path, 'Liver', liver_metrics)
         write_metrics(metrics_path, 'Lesion', lesion_metrics)

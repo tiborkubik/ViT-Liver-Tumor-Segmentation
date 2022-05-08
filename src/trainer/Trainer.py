@@ -127,7 +127,7 @@ class Trainer:
 
     def select_criterion(self):
         if self.loss == 'MSE':
-            return WeightedMSELoss()
+            return WeightedMSELoss(self.w_liver, self.w_tumor)
         if self.loss == 'Dice':
             return DiceLoss()
         if self.loss == 'BCE':
