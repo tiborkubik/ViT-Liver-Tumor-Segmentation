@@ -15,6 +15,7 @@ from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE, VolumeMe
 from src.networks.utils import create_model
 from src.trainer import config
 from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
+from src.evaluation.utils import print_metrics
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -23,13 +24,19 @@ logging.getLogger().setLevel(logging.DEBUG)
 class Evaluator:
 
     def __init__(self, dataset_path, model, device, liver_metrics: List[VolumeMetric],
-                 lesion_metrics: List[VolumeMetric]):
+                 lesion_metrics: List[VolumeMetric], apply_masking: bool,
+                 apply_morphological: bool, kernel_liver: int, kernel_tumor: int):
         self.dataset_path = dataset_path
         self.model = model
         self.device = device
         self.liver_metrics = liver_metrics
         self.lesion_metrics = lesion_metrics
         self.dataset = LiverTumorDataset(dataset_path=dataset_path)
+
+        self.apply_masking = apply_masking
+        self.apply_morphological = apply_morphological
+        self.kernel_liver = kernel_liver
+        self.kernel_tumor = kernel_tumor
 
     def evaluate(self, volumes=None):
         if volumes is None:
@@ -58,6 +65,18 @@ class Evaluator:
                 preds_lesion = preds_lesion.cpu()
                 masks_liver = masks_liver.cpu()
                 masks_lesion = masks_lesion.cpu()
+
+                preds_liver_np = preds_liver.numpy()
+                preds_liver_np = (preds_liver_np > 0.3).astype(np.float32)
+
+                preds_lesion_np = preds_lesion.numpy()
+                preds_lesion_np = (preds_lesion_np > 0.3).astype(np.float32)
+
+                preds_liver_np, preds_lesion_np = self.postprocess(preds_liver_np,
+                                                                   preds_lesion_np)
+
+                preds_liver = torch.from_numpy(preds_liver_np)
+                preds_lesion = torch.from_numpy(preds_lesion_np)
 
                 self._update_metrics(self.liver_metrics, preds_liver, masks_liver, vol_idx)
                 self._update_metrics(self.lesion_metrics, preds_lesion, masks_lesion, vol_idx)
@@ -97,7 +116,7 @@ class Evaluator:
 
                 slice_predictions = self.model(inputs_batch)[0]
 
-                liver_mask, tumor_mask = self._postprocesses_mask(slice_predictions.numpy(),
+                liver_mask, tumor_mask = self._postprocesses_mask(slice_predictions.cpu().numpy(),
                                                                   new_size=volume_data.shape[:2],
                                                                   threshold=0.3)
                 liver_masks.append(liver_mask)
@@ -135,7 +154,32 @@ class Evaluator:
         tumor_mask = binarized_mask[1]
         resized_liver_mask = cv2.resize(liver_mask, new_size, interpolation=cv2.INTER_AREA)
         resized_tumor_mask = cv2.resize(tumor_mask, new_size, interpolation=cv2.INTER_AREA)
-        return resized_liver_mask, resized_tumor_mask
+
+        liver_mask_postprocessed, tumor_mask_postprocessed = self.postprocess(resized_liver_mask, resized_tumor_mask)
+
+        return liver_mask_postprocessed, tumor_mask_postprocessed
+
+    def postprocess(self, resized_liver_mask, resized_tumor_mask):
+        if self.apply_morphological:
+            kernel_liver = np.ones((self.kernel_liver, self.kernel_liver), np.uint8)
+            kernel_tumor = np.ones((self.kernel_tumor, self.kernel_tumor), np.uint8)
+
+            # Apply morphological operations on liver prediction.
+            liver_mask_postprocessed = cv2.morphologyEx(resized_liver_mask, cv2.MORPH_OPEN, kernel_liver)
+            liver_mask_postprocessed = cv2.morphologyEx(liver_mask_postprocessed, cv2.MORPH_CLOSE, kernel_liver)
+
+            # Apply morphological operations on tumor prediction.
+            tumor_mask_postprocessed = cv2.morphologyEx(resized_tumor_mask, cv2.MORPH_OPEN, kernel_tumor)
+            tumor_mask_postprocessed = cv2.morphologyEx(tumor_mask_postprocessed, cv2.MORPH_CLOSE, kernel_tumor)
+        else:
+            liver_mask_postprocessed = resized_liver_mask
+            tumor_mask_postprocessed = resized_tumor_mask
+
+        if self.apply_masking:
+            tumor_mask_postprocessed = liver_mask_postprocessed.astype(bool) & tumor_mask_postprocessed.astype(bool)
+            tumor_mask_postprocessed = tumor_mask_postprocessed.astype(np.float32)
+
+        return liver_mask_postprocessed, tumor_mask_postprocessed
 
     def generate_zip(self, save_dir: str, zip_name: str) -> None:
         os.makedirs(args.zip_location, exist_ok=True)
@@ -167,6 +211,17 @@ def parse_args():
                         default='trained_weights/UNet/03-25-18-49-14-UNet.pt', help='Trained model weights')
     parser.add_argument('-n', '--network-name', metavar='NN', type=str,
                         default='UNet', help='Network name')
+    parser.add_argument('-p1', '--postprocess-masking', metavar='P1', type=bool, default=True, dest='apply_masking',
+                        help='Apply a postprocessing, where the tumor parts detected out of the liver mask is not'
+                             'considered.')
+    parser.add_argument('-p2', '--postprocess-morphological', metavar='P2', type=bool, default=True,
+                        dest='apply_morphological', help='Apply morphological operations on detected masks to get rid'
+                                                         'of holes and noise.')
+    parser.add_argument('-kl', '--kernel-liver', metavar='KL', type=int, default=15,
+                        dest='kernel_liver', help='Size of kernel for morphological post-processing on liver.')
+    parser.add_argument('-kt', '--kernel-tumor', metavar='KT', type=int, default=3,
+                        dest='kernel_tumor', help='Size of kernel for morphological post-processing on tumor.')
+
     args = parser.parse_args()
 
     assert args.dataset is not None
@@ -185,13 +240,14 @@ if __name__ == "__main__":
 
     liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
     lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-    evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics)
+    evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics,
+                          args.apply_masking, args.apply_morphological, args.kernel_liver, args.kernel_tumor)
 
-    evaluator.generate_zip(args.zip_location, 'submission.zip')
+    # evaluator.generate_zip(args.zip_location, 'submission.zip')
 
-    # evaluator.evaluate()
+    evaluator.evaluate()
     #
-    # write_metrics('metrics.log', 'Liver', liver_metrics)
-    # write_metrics('metrics.log', 'Lesion', lesion_metrics)
+    print_metrics('Liver', liver_metrics)
+    print_metrics('Lesion', lesion_metrics)
 
     # evaluator.create_nii(0, 'dataset/predictions')
