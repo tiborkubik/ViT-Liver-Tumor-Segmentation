@@ -12,6 +12,7 @@ import torch
 from tqdm import tqdm
 
 from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE, VolumeMetric
+from src.evaluation.utils import write_metrics
 from src.networks.utils import create_model
 from src.trainer import config
 from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
@@ -226,6 +227,12 @@ def parse_args():
     parser.add_argument('-kt', '--kernel-tumor', metavar='KT', type=int, default=3,
                         dest='kernel_tumor', help='Size of kernel for morphological post-processing on tumor.')
 
+    parser.add_argument('-sp', '--save-prefix', metavar='SP', type=str,
+                        default="", help='Prefix of path to save outputs',
+                        dest='save_prefix')
+    parser.add_argument('-z', '--generate-zip', metavar='GZ', type=bool, default=False, dest='generate_zip',
+                        help='Whether to generate zip. Performs evaluation without creating volumes instead if false.')
+
     args = parser.parse_args()
 
     assert args.dataset is not None
@@ -247,11 +254,11 @@ if __name__ == "__main__":
     evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics,
                           args.apply_masking, args.apply_morphological, args.kernel_liver, args.kernel_tumor)
 
-    evaluator.generate_zip(args.zip_location, 'submission.zip')
+    if args.generate_zip:
+        evaluator.generate_zip(args.zip_location, 'submission.zip')
+    else:
+        evaluator.evaluate()
 
-    # evaluator.evaluate()
-
-    # print_metrics('Liver', liver_metrics)
-    # print_metrics('Lesion', lesion_metrics)
-
-    # evaluator.create_nii(0, 'dataset/predictions')
+        metrics_path = os.path.join(args.save_prefix, 'metrics.log')
+        write_metrics(metrics_path, 'Liver', liver_metrics)
+        write_metrics(metrics_path, 'Lesion', lesion_metrics)
