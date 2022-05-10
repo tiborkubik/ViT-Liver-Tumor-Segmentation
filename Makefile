@@ -5,4 +5,4 @@ clean_cache:
 
 .PHONY: arch
 arch:
-	zip -r xpolok03_xkubik34_xondri07.zip src documentation.pdf requirements.txt run_job.sh README.md LICENSE
+	zip -r xpolok03_xkubik34_xondri07.zip src documentation.pdf requirements.txt run_job.sh README.md LICENSE presentation.pdf
