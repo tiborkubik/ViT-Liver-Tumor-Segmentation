@@ -14,8 +14,6 @@
     This file was created as a part of project called 'Visual Transformers for Liver and Liver Tumor Segmentation from
     CT Scans of Human Abdomens' for KNN/2021L course.
 """
-
-import torch
 import torch.nn as nn
 
 
@@ -30,7 +28,6 @@ class WeightedMSELoss(nn.Module):
         self.mse = nn.MSELoss()
 
     def forward(self, x, y):
-
         w_loss_liver = self.w_liver * self.mse(x[:, 0:1, :], y[:, 0:1, :])
         w_loss_tumor = self.w_tumor * self.mse(x[:, 1:2, :], y[:, 1:2, :])
 

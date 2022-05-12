@@ -20,11 +20,9 @@ import torch
 import logging
 import argparse
 import src.trainer.config as config
-from src.evaluation.evaluator import Evaluator
-from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE
 from src.networks.utils import create_model
 from src.trainer.Trainer import Trainer
-from src.evaluation.utils import write_metrics
+from src.evaluation.evaluate_all_possible_settings import evaluate
 
 
 def parse_args():
@@ -92,7 +90,8 @@ def parse_args():
                         dest='kernel_liver', help='Size of kernel for morphological post-processing on liver.')
     parser.add_argument('-kt', '--kernel-tumor', metavar='KT', type=int, default=3,
                         dest='kernel_tumor', help='Size of kernel for morphological post-processing on tumor.')
-
+    parser.add_argument('-ev', '--evaluate', action='store_true', dest='evaluate',
+                        help='Whether to evaluate different postprocessing methods on val split after training.')
     args = parser.parse_args()
 
     assert args.dataset_train is not None
@@ -140,16 +139,9 @@ if __name__ == '__main__':
 
     try:
         trainer.training()
-
-        liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-        lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-        evaluator = Evaluator(args.dataset_val, network, device, liver_metrics, lesion_metrics,
-                              args.apply_masking, args.apply_morphological, args.kernel_liver, args.kernel_tumor)
-        evaluator.evaluate()
-
-        metrics_path = os.path.join(args.s_prefix, 'metrics.log')
-        write_metrics(metrics_path, 'Liver', liver_metrics)
-        write_metrics(metrics_path, 'Lesion', lesion_metrics)
+        if args.evaluate:
+            metrics_path = os.path.join(args.s_prefix, 'metrics.log')
+            evaluate(network, device, args.dataset_val, metrics_path)
 
     except KeyboardInterrupt:
         torch.save(network.state_dict(), os.path.join(args.s_prefix, 'interrupted_model.pt'))

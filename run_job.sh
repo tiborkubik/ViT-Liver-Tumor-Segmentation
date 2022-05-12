@@ -1,9 +1,9 @@
 #!/bin/bash
-#PBS -N ViT-Liver-Tumor-Segmentation-2D-UNET
+#PBS -N ViT-Liver-Tumor-Segmentation
 #PBS -q gpu
 #PBS -l select=1:ngpus=1:gpu_cap=cuda75:cl_adan=True:mem=32gb:scratch_local=100gb
 #PBS -l walltime=24:00:00
-#PBS -m abe
+#PBS -J 3-5
 
 find_in_conda_env() {
   conda env list | grep "${@}" >/dev/null 2>/dev/null
@@ -11,11 +11,11 @@ find_in_conda_env() {
 
 # Clean up after exit
 #trap 'clean_scratch' EXIT
+config=$(<$DATADIR/configs/config"${PBS_ARRAY_INDEX}".txt)
 
-JOB_ID="2D_UNET"
 DATADIR=/storage/brno2/home/lakoc/ViT-Liver-Tumor-Segmentation
 
-echo "$PBS_JOBID is running on node $(hostname -f) in a scratch directory $SCRATCHDIR: $(date +"%T")"
+echo "$PBS_JOBID is running on node $(hostname -f) in a scratch directory $SCRATCHDIR with following config: $config. Time: $(date +"%T")"
 
 #Copy source codes
 echo "Copying ENV. $(date +"%T")"
@@ -86,24 +86,24 @@ mkdir "$SCRATCHDIR/documentation"
 echo "All ready. Starting trainer: $(date +"%T")"
 BACKBONE="$DATADIR/backbones/imagenet21k_R50+ViT-B_16.npz"
 
-python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -tm 2D -sp $SCRATCHDIR -e 2 -n UNet -lo MSE -vw $BACKBONE
+python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -sp $SCRATCHDIR -vw $BACKBONE $config
 
 echo "Cleaning environment: $(date +"%T")"
 conda deactivate
 
 echo "Training done. Copying back to FE: $(date +"%T")"
-mkdir "$DATADIR/$JOB_ID"
+mkdir "$DATADIR/$PBS_ARRAY_INDEX"
 # Copy data back to FE
-cp -r "$SCRATCHDIR/documentation" "$DATADIR/$JOB_ID" || {
+cp -r "$SCRATCHDIR/documentation" "$DATADIR/$PBS_ARRAY_INDEX" || {
   echo >&2 "Couldnt copy documentation to datadir."
   exit 3
 }
-cp -r "$SCRATCHDIR/trained-weights" "$DATADIR/$JOB_ID" || {
+cp -r "$SCRATCHDIR/trained-weights" "$DATADIR/$PBS_ARRAY_INDEX" || {
   echo >&2 "Couldnt copy weights to datadir."
   exit 3
 }
 
-cp -r "$SCRATCHDIR/metrics.log" "$DATADIR/$JOB_ID" || {
+cp -r "$SCRATCHDIR/metrics.log" "$DATADIR/$PBS_ARRAY_INDEX" || {
   echo >&2 "Couldnt copy metrics log."
   exit 3
 }

@@ -234,7 +234,7 @@ def parse_args():
     parser.add_argument('-sp', '--save-prefix', metavar='SP', type=str,
                         default="", help='Prefix of path to save outputs',
                         dest='save_prefix')
-    parser.add_argument('-z', '--generate-zip', metavar='GZ', type=bool, default=False, dest='generate_zip',
+    parser.add_argument('-z', '--generate-zip', action='store_true', dest='generate_zip',
                         help='Whether to generate zip. Performs evaluation without creating volumes instead if false.')
 
     args = parser.parse_args()

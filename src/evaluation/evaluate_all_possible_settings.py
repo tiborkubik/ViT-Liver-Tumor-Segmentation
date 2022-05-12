@@ -32,6 +32,23 @@ def parse_args():
     return args
 
 
+def evaluate(model, device, dataset, metrics_path):
+    for apply_morphological in [True, False]:
+        for apply_masking in [True, False]:
+            for liver_kernel in range(2, 20 + 1) if apply_morphological else [None]:
+                for tumor_kernel in range(2, 10 + 1) if apply_morphological else [None]:
+                    setting = f'liver_kernel: {liver_kernel}, tumor_kernel: {tumor_kernel}, ' \
+                              f'apply_morphological: {apply_morphological}, apply_masking: {apply_masking}'
+                    logging.debug(setting)
+                    liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
+                    lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
+                    evaluator = Evaluator(dataset, model, device, liver_metrics, lesion_metrics,
+                                          apply_masking, apply_morphological, liver_kernel, tumor_kernel)
+                    evaluator.evaluate()
+                    write_metrics(metrics_path, f'Liver {setting}', liver_metrics)
+                    write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
+
+
 if __name__ == "__main__":
     args = parse_args()
     model = create_model(args.network_name, weights_path=args.weights, training_mode='2D')
@@ -39,17 +56,4 @@ if __name__ == "__main__":
     model.to(device)
 
     metrics_path = os.path.join(args.save_prefix, 'metrics.log')
-    for apply_morphological in [True, False]:
-        for apply_masking in [True, False]:
-            for liver_kernel in range(2, 20+1) if apply_morphological else [None]:
-                for tumor_kernel in range(2, 10+1) if apply_morphological else [None]:
-                    setting = f'liver_kernel: {liver_kernel}, tumor_kernel: {tumor_kernel}, ' \
-                              f'apply_morphological: {apply_morphological}, apply_masking: {apply_masking}'
-                    logging.debug(setting)
-                    liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-                    lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-                    evaluator = Evaluator(args.dataset, model, device, liver_metrics, lesion_metrics,
-                                          apply_masking, apply_morphological, liver_kernel, tumor_kernel)
-                    evaluator.evaluate()
-                    write_metrics(metrics_path, f'Liver {setting}', liver_metrics)
-                    write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
+    evaluate(model, device, args.dataset, metrics_path)

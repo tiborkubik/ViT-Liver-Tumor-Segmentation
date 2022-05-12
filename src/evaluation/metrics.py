@@ -33,7 +33,10 @@ class VolumeMetric(ABC):
         scores = per_volume_scores.values()
         scores_sum = sum(scores)
         scores_num = len(scores)
-        score = scores_sum / scores_num
+        try:
+            score = scores_sum / scores_num
+        except ZeroDivisionError:
+            score = None
         return score
 
     def compute_per_volume(self):
