@@ -1,20 +1,19 @@
 import argparse
-import glob
-import logging
 import os
-import zipfile
-from typing import List, Tuple
-
-import cv2
 import nibabel as nib
+import logging
 import numpy as np
+import zipfile
+import glob
+import cv2
 import torch
-from tqdm import tqdm
 
+from tqdm import tqdm
+from src.trainer import config
+from typing import List, Tuple
 from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE, VolumeMetric
 from src.evaluation.utils import write_metrics
 from src.networks.utils import create_model
-from src.trainer import config
 from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
 
 logging.basicConfig()
@@ -89,53 +88,18 @@ class Evaluator:
         inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
         return inputs_batch, masks, vol_idx
 
-    def _reset_metrics(self, metrics):
+    @staticmethod
+    def _reset_metrics(metrics):
         for metric in metrics:
             metric.reset()
 
-    def _update_metrics(self, metrics, preds, masks, vol_idx):
+    @staticmethod
+    def _update_metrics(metrics, preds, masks, vol_idx):
         for metric in metrics:
             metric.update(preds, masks, vol_idx)
 
-    def create_nii(self, volume_path: str, save_path: str, volume_idx: int) -> None:
-        volume_image = nib.load(volume_path)
-        volume_data = volume_image.get_fdata()
-        num_slices = volume_data.shape[2]
-        logging.debug(F"Volume shape: {volume_data.shape}")
-
-        liver_masks = []
-        tumor_masks = []
-
-        with torch.no_grad():
-            for slice_idx in range(num_slices):
-                slice = self._prepare_slice(volume_data, slice_idx)
-                inputs = torch.tensor(slice).type(torch.FloatTensor).to(self.device)
-
-                # Add batch and channel dimension
-                inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
-
-                slice_predictions = self.model(inputs_batch)[0]
-
-                liver_mask, tumor_mask = self._postprocesses_mask(slice_predictions.cpu().numpy(),
-                                                                  new_size=volume_data.shape[:2],
-                                                                  threshold=0.3)
-                liver_masks.append(liver_mask)
-                tumor_masks.append(tumor_mask)
-
-        # Stack all slices into a single array
-        liver_slices = np.stack(liver_masks, -1)
-        tumor_slices = np.stack(tumor_masks, -1)
-        slices = self._combine_liver_and_tumor_slices(liver_slices, tumor_slices)
-
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-
-        logging.debug(F"Created segmentation volume with shape: {slices.shape}")
-        # Save as .nii files
-        segmentation_path = os.path.join(save_path, f"test-segmentation-{volume_idx}.nii")
-        nib.save(nib.Nifti1Image(slices, affine=volume_image.affine), segmentation_path)
-
-    def _combine_liver_and_tumor_slices(self, liver_slices, tumor_slices):
+    @staticmethod
+    def _combine_liver_and_tumor_slices(liver_slices, tumor_slices):
         # Tumor should be indicated by value 2
         tumor_slices *= 2
 
@@ -144,13 +108,6 @@ class Evaluator:
         # Replace value 3 (liver + lesion) with 2 (lesion)
         slices[slices > 2] = 2
         return slices
-
-    def _prepare_slice(self, volume, slice_idx):
-        slice = volume[:, :, slice_idx]
-        resized_slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
-                                   interpolation=cv2.INTER_AREA)
-        normalized_slice = normalize_slice(resized_slice)
-        return normalized_slice
 
     def _postprocesses_mask(self, pred_mask: np.ndarray, new_size: Tuple, threshold: float) -> Tuple[
         np.ndarray, np.ndarray]:
@@ -191,10 +148,11 @@ class Evaluator:
         vols_pattern = os.path.join(self.dataset_path, 'vols-3d', '*')
         vol_file_paths = glob.glob(vols_pattern)
         for volume_idx, volume_path in enumerate(vol_file_paths):
-            evaluator.create_nii(volume_path, save_dir, volume_idx)
+            self.create_nii(volume_path, save_dir, volume_idx)
         self._save_files_to_zip(save_dir, zip_name)
 
-    def _save_files_to_zip(self, dir: str, zip_name: str):
+    @staticmethod
+    def _save_files_to_zip(dir: str, zip_name: str):
         vols_pattern = os.path.join(dir, '*.nii')
         vol_files = glob.glob(vols_pattern)
         zip_path = os.path.join(dir, zip_name)
@@ -202,6 +160,52 @@ class Evaluator:
             for vol_filepath in vol_files:
                 vol_filename = os.path.basename(vol_filepath)
                 zipf.write(vol_filepath, vol_filename)
+
+    def create_nii(self, volume_path: str, save_path: str, volume_idx: int) -> None:
+        volume_image = nib.load(volume_path)
+        volume_data = volume_image.get_fdata()
+        num_slices = volume_data.shape[2]
+        logging.debug(F"Volume shape: {volume_data.shape}")
+
+        liver_masks = []
+        tumor_masks = []
+
+        with torch.no_grad():
+            for slice_idx in range(num_slices):
+                slice = self._prepare_slice(volume_data, slice_idx)
+                inputs = torch.tensor(slice).type(torch.FloatTensor).to(self.device)
+
+                # Add batch and channel dimension
+                inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
+
+                slice_predictions = self.model(inputs_batch)[0]
+
+                liver_mask, tumor_mask = self._postprocesses_mask(slice_predictions.cpu().numpy(),
+                                                                  new_size=volume_data.shape[:2],
+                                                                  threshold=0.3)
+                liver_masks.append(liver_mask)
+                tumor_masks.append(tumor_mask)
+
+        # Stack all slices into a single array
+        liver_slices = np.stack(liver_masks, -1)
+        tumor_slices = np.stack(tumor_masks, -1)
+        slices = self._combine_liver_and_tumor_slices(liver_slices, tumor_slices)
+
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        logging.debug(F"Created segmentation volume with shape: {slices.shape}")
+        # Save as .nii files
+        segmentation_path = os.path.join(save_path, f"test-segmentation-{volume_idx}.nii")
+        nib.save(nib.Nifti1Image(slices, affine=volume_image.affine), segmentation_path)
+
+    @staticmethod
+    def _prepare_slice(volume, slice_idx):
+        slice = volume[:, :, slice_idx]
+        resized_slice = cv2.resize(slice, (config.DIMENSIONS['input_net'], config.DIMENSIONS['input_net']),
+                                   interpolation=cv2.INTER_AREA)
+        normalized_slice = normalize_slice(resized_slice)
+        return normalized_slice
 
 
 def parse_args():
@@ -216,10 +220,10 @@ def parse_args():
                         default='trained_weights/UNet/03-25-18-49-14-UNet.pt', help='Trained model weights')
     parser.add_argument('-n', '--network-name', metavar='NN', type=str,
                         default='UNet', help='Network name')
-    parser.add_argument('-p1', '--postprocess-masking', metavar='P1', type=bool, default=True, dest='apply_masking',
+    parser.add_argument('-p1', '--postprocess-masking', metavar='P1', action='store_true', dest='apply_masking',
                         help='Apply a postprocessing, where the tumor parts detected out of the liver mask is not'
                              'considered.')
-    parser.add_argument('-p2', '--postprocess-morphological', metavar='P2', type=bool, default=True,
+    parser.add_argument('-p2', '--postprocess-morphological', metavar='P2', action='store_true',
                         dest='apply_morphological', help='Apply morphological operations on detected masks to get rid'
                                                          'of holes and noise.')
     parser.add_argument('-kl', '--kernel-liver', metavar='KL', type=int, default=15,
@@ -243,7 +247,6 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    logging.debug("message")
     args = parse_args()
     model = create_model(args.network_name, weights_path=args.weights, training_mode='2D')
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -258,7 +261,6 @@ if __name__ == "__main__":
         evaluator.generate_zip(args.zip_location, 'submission.zip')
     else:
         evaluator.evaluate()
-
         metrics_path = os.path.join(args.save_prefix, 'metrics.log')
         write_metrics(metrics_path, 'Liver', liver_metrics)
         write_metrics(metrics_path, 'Lesion', lesion_metrics)
