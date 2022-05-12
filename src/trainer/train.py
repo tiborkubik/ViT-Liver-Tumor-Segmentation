@@ -78,18 +78,6 @@ def parse_args():
     parser.add_argument('-vw', '--vit_weights', metavar='VW', type=str, dest='v_weights',
                         default="",
                         help='Pretrained vision transformer model weights')
-
-    ''' Evaluation post-processing. '''
-    parser.add_argument('-p1', '--postprocess-masking', metavar='P1', type=bool, default=False, dest='apply_masking',
-                        help='Apply a postprocessing, where the tumor parts detected out of the liver mask is not'
-                             'considered.')
-    parser.add_argument('-p2', '--postprocess-morphological', metavar='P2', type=bool, default=False,
-                        dest='apply_morphological', help='Apply morphological operations on detected masks to get rid'
-                                                         'of holes and noise.')
-    parser.add_argument('-kl', '--kernel-liver', metavar='KL', type=int, default=15,
-                        dest='kernel_liver', help='Size of kernel for morphological post-processing on liver.')
-    parser.add_argument('-kt', '--kernel-tumor', metavar='KT', type=int, default=3,
-                        dest='kernel_tumor', help='Size of kernel for morphological post-processing on tumor.')
     parser.add_argument('-ev', '--evaluate', action='store_true', dest='evaluate',
                         help='Whether to evaluate different postprocessing methods on val split after training.')
     args = parser.parse_args()
