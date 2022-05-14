@@ -7,7 +7,7 @@ weights_liver = ["1.0", "2.0"]
 options = [('-tm', modes), ('-n', models), ('-lo', losses), ('-wl', weights_liver)]
 
 non_acceptable_options = [('2.5D', 'TransUNet')]
-edit_options = [('2D', '2D -b 128'), ('-b 128 -n TransUNet', '-b 16 -n TransUNet')]
+edit_options = []
 configs_path = 'configs'
 
 
