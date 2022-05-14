@@ -52,9 +52,7 @@ class LiverTumorDataset(Dataset):
 
         w_path = os.path.join(self.dataset_path, 'vols-2d/')
 
-        all_slice_files = [file
-                           for path, subdir, files in os.walk(w_path)
-                           for file in glob.glob(os.path.join(path, EXT))]
+        all_slice_files = glob.glob(os.path.join(glob.escape(w_path), EXT))
 
         if len(all_slice_files) == 0:
             logging.warning(F"No volume file found in {w_path}")

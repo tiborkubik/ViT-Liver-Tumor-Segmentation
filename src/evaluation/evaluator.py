@@ -145,7 +145,7 @@ class Evaluator:
 
     def generate_zip(self, save_dir: str, zip_name: str) -> None:
         os.makedirs(args.zip_location, exist_ok=True)
-        vols_pattern = os.path.join(self.dataset_path, 'vols-3d', '*')
+        vols_pattern = os.path.join(glob.escape(self.dataset_path), 'vols-3d', '*')
         vol_file_paths = glob.glob(vols_pattern)
         for volume_idx, volume_path in enumerate(vol_file_paths):
             self.create_nii(volume_path, save_dir, volume_idx)
@@ -153,7 +153,7 @@ class Evaluator:
 
     @staticmethod
     def _save_files_to_zip(dir: str, zip_name: str):
-        vols_pattern = os.path.join(dir, '*.nii')
+        vols_pattern = os.path.join(glob.escape(dir), '*.nii')
         vol_files = glob.glob(vols_pattern)
         zip_path = os.path.join(dir, zip_name)
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
