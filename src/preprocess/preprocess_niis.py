@@ -27,7 +27,7 @@ def pre_process_niis(path):
         os.makedirs(segs_slices_path)
 
     # Paths of .nii volumes.
-    all_nii_files = glob.glob(os.path.join(w_path, '*.nii'))
+    all_nii_files = glob.glob(os.path.join(glob.escape(w_path), '*.nii'))
 
     if len(all_nii_files) == 0:
         logging.warning(F"No .nii file was found in {path}")
