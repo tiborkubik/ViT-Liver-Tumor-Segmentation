@@ -3,7 +3,7 @@
 #PBS -q gpu
 #PBS -l select=1:ngpus=1:gpu_cap=cuda75:cl_adan=True:mem=32gb:scratch_local=100gb
 #PBS -l walltime=24:00:00
-#PBS -J 1-2
+#PBS -J 1-20
 
 find_in_conda_env() {
 conda env list | grep "${@}" >/dev/null 2>/dev/null

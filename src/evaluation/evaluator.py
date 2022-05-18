@@ -24,13 +24,13 @@ class Evaluator:
 
     def __init__(self, dataset_path, model, device, liver_metrics: List[VolumeMetric],
                  lesion_metrics: List[VolumeMetric], apply_masking: bool,
-                 apply_morphological: bool, kernel_liver: int, kernel_tumor: int):
+                 apply_morphological: bool, kernel_liver: int, kernel_tumor: int, training_mode='2D'):
         self.dataset_path = dataset_path
         self.model = model
         self.device = device
         self.liver_metrics = liver_metrics
         self.lesion_metrics = lesion_metrics
-        self.dataset = LiverTumorDataset(dataset_path=dataset_path)
+        self.dataset = LiverTumorDataset(dataset_path=dataset_path, training_mode=training_mode)
 
         self.apply_masking = apply_masking
         self.apply_morphological = apply_morphological

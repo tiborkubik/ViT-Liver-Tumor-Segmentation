@@ -7,6 +7,7 @@ from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE
 from src.evaluation.utils import write_metrics
 from src.networks.utils import create_model
 from src.evaluation.evaluator import Evaluator
+from src.trainer import config
 
 
 def parse_args():
@@ -22,7 +23,9 @@ def parse_args():
     parser.add_argument('-sp', '--save-prefix', metavar='SP', type=str,
                         default="", help='Prefix of path to save outputs',
                         dest='save_prefix')
-
+    parser.add_argument('-tm', '--training-mode', metavar='TM', type=str,
+                        default=config.HYPERPARAMETERS['training_mode'], help='2D or 2.5D training...',
+                        dest='training_mode')
     args = parser.parse_args()
 
     assert args.dataset is not None
@@ -32,7 +35,7 @@ def parse_args():
     return args
 
 
-def evaluate(model, device, dataset, metrics_path):
+def evaluate(model, device, dataset, metrics_path, training_mode):
     for apply_morphological in [True, False]:
         if not apply_morphological:
             for apply_masking in [True, False]:
@@ -42,7 +45,7 @@ def evaluate(model, device, dataset, metrics_path):
                 liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
                 lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
                 evaluator = Evaluator(dataset, model, device, liver_metrics, lesion_metrics,
-                                      apply_masking, apply_morphological, 0, 0)
+                                      apply_masking, apply_morphological, 0, 0, training_mode)
                 evaluator.evaluate()
                 write_metrics(metrics_path, f'Liver {setting}', liver_metrics)
                 write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
@@ -58,7 +61,8 @@ def evaluate(model, device, dataset, metrics_path):
                         liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
                         lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
                         evaluator = Evaluator(dataset, model, device, liver_metrics, lesion_metrics,
-                                              apply_masking, apply_morphological, liver_kernel, tumor_kernel)
+                                              apply_masking, apply_morphological, liver_kernel, tumor_kernel,
+                                              training_mode)
                         evaluator.evaluate()
                         write_metrics(metrics_path, f'Liver {setting}', liver_metrics)
                         write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
@@ -71,4 +75,4 @@ if __name__ == "__main__":
     model.to(device)
 
     metrics_path = os.path.join(args.save_prefix, 'metrics.log')
-    evaluate(model, device, args.dataset, metrics_path)
+    evaluate(model, device, args.dataset, metrics_path, args.training_mode)
