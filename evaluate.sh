@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N ViT-Liver-Tumor-Segmentation
 #PBS -q gpu
-#PBS -l select=1:ngpus=1:gpu_cap=cuda75:cl_adan=True:mem=32gb
+#PBS -l select=1:ngpus=1:gpu_cap=cuda75:cl_adan=True:mem=32gb:scratch_local=10gb
 #PBS -l walltime=24:00:00
 
 find_in_conda_env() {
@@ -27,8 +27,29 @@ echo "All packages installed. $(date +"%T")"
 
 ID=4
 MODEL="AttentionUNet"
+
+cp -r "$DATADIR/src" "$SCRATCHDIR/src" || {
+  echo >&2 "Couldnt copy srcdir to scratchdir."
+  exit 2
+}
+
+cp -r "$DATADIR/data/dataset/val" "$SCRATCHDIR/dataset" || {
+  echo >&2 "Couldnt copy dataset to scratchdir."
+  exit 2
+}
+
+cp -r "$DATADIR/$ID/trained-weights/$MODEL/best-weights.pt" "$SCRATCHDIR" || {
+  echo >&2 "Couldnt copy model to scratchdir."
+  exit 2
+}
+
 export PYTHONPATH=$DATADIR
-python  "$DATADIR/src/evaluation/evaluate_all_possible_settings.py" -d "$DATADIR/data/dataset/val" -w "$DATADIR/$ID/trained-weights/$MODEL/best-weights.pt" -n $MODEL -sp "$DATADIR/$ID/" -tm 2.5D -b 100
+python  "$SCRATCHDIR/src/evaluation/evaluate_all_possible_settings.py" -d "$SCRATCHDIR/dataset" -w "$SCRATCHDIR/best-weights.pt" -n $MODEL -sp $SCRATCHDIR -tm 2.5D -b 100
+
+cp -r "$SCRATCHDIR/metrics.log" "$DATADIR/$ID" || {
+  echo >&2 "Couldnt copy metrics log."
+  exit 3
+}
 
 echo "Cleaning environment: $(date +"%T")"
 conda deactivate
