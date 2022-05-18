@@ -62,7 +62,6 @@ class LiverTumorDataset(Dataset):
             self.slices.append((slice_path, mask_path))
 
     def __getitem__(self, item):
-
         volume_path = self.slices[item][0]
         segmentation_path = self.slices[item][1]
         vol_idx = self._get_vol_idx(volume_path)
@@ -165,7 +164,7 @@ class LiverTumorDataset(Dataset):
                 sample[key] = torch.from_numpy(sample[key])
 
 
-        sample['masks'] = torch.concat([sample['masks_liver'], sample['masks_tumor']])
+        sample['masks'] = torch.stack([sample['masks_liver'], sample['masks_tumor']])
         sample['vol_idx'] = vol_idx
         del sample['masks_liver']
         del sample['masks_tumor']

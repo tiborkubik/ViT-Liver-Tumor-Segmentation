@@ -14,7 +14,7 @@ from typing import List, Tuple
 from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE, VolumeMetric
 from src.evaluation.utils import write_metrics
 from src.networks.utils import create_model
-from src.trainer.LiverTumorDataset import LiverTumorDataset, normalize_slice
+from src.trainer.LiverTumorDataset import get_dataset_loader, normalize_slice
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -24,19 +24,20 @@ class Evaluator:
 
     def __init__(self, dataset_path, model, device, liver_metrics: List[VolumeMetric],
                  lesion_metrics: List[VolumeMetric], apply_masking: bool,
-                 apply_morphological: bool, kernel_liver: int, kernel_tumor: int, training_mode='2D'):
+                 apply_morphological: bool, kernel_liver: int, kernel_tumor: int, training_mode='2D', batch_size=32):
         self.dataset_path = dataset_path
         self.model = model
         self.device = device
         self.liver_metrics = liver_metrics
         self.lesion_metrics = lesion_metrics
-        self.dataset = LiverTumorDataset(dataset_path=dataset_path, training_mode=training_mode)
+        self.dataset = get_dataset_loader(dataset_path=dataset_path, training_mode=training_mode, batch_size=batch_size)
 
         self.apply_masking = apply_masking
         self.apply_morphological = apply_morphological
         self.kernel_liver = kernel_liver
         self.kernel_tumor = kernel_tumor
         self.training_mode = training_mode
+        self.batch_size = batch_size
 
     def evaluate(self, volumes=None):
         if volumes is None:
@@ -57,9 +58,8 @@ class Evaluator:
                 preds_liver = predictions[:, 0, :, :]
                 preds_lesion = predictions[:, 1, :, :]
 
-                masks_reshaped = torch.reshape(masks, predictions.size())
-                masks_liver = masks_reshaped[:, 0, :, :]
-                masks_lesion = masks_reshaped[:, 1, :, :]
+                masks_liver = masks[:, 0, :, :]
+                masks_lesion = masks[:, 1, :, :]
 
                 preds_liver = preds_liver.cpu()
                 preds_lesion = preds_lesion.cpu()
@@ -72,24 +72,26 @@ class Evaluator:
                 preds_lesion_np = preds_lesion.numpy()
                 preds_lesion_np = (preds_lesion_np > 0.3).astype(np.float32)
 
-                preds_liver_np, preds_lesion_np = self.postprocess(preds_liver_np,
-                                                                   preds_lesion_np)
-
-                preds_liver = torch.from_numpy(preds_liver_np)
-                preds_lesion = torch.from_numpy(preds_lesion_np)
-
-                self._update_metrics(self.liver_metrics, preds_liver, masks_liver, vol_idx)
-                self._update_metrics(self.lesion_metrics, preds_lesion, masks_lesion, vol_idx)
+                for prediction in range(self.batch_size):
+                    pred_liver_np, pred_lesion_np = self.postprocess(preds_liver_np[prediction],
+                                                                       preds_lesion_np[prediction])
+                    pred_liver = torch.from_numpy(pred_liver_np)
+                    pred_lesion = torch.from_numpy(pred_lesion_np)
+                    self._update_metrics(self.liver_metrics, pred_liver, masks_liver[prediction], vol_idx[prediction])
+                    self._update_metrics(self.lesion_metrics, pred_lesion, masks_lesion[prediction], vol_idx[prediction])
 
     def _prepare_sample(self, sample):
         inputs = sample['images'].type(torch.FloatTensor).to(self.device)
         masks = sample['masks'].type(torch.FloatTensor).to(self.device)
         vol_idx = sample['vol_idx']
         # Add batch and channel dimension
-        if self.training_mode == '2D':
-            inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
+        if inputs.dim() != 4:
+            if self.training_mode == '2D':
+                inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
+            else:
+                inputs_batch = inputs.unsqueeze(0)
         else:
-            inputs_batch = inputs.unsqueeze(0)
+            inputs_batch = inputs
         return inputs_batch, masks, vol_idx
 
     @staticmethod

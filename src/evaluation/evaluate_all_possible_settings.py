@@ -26,6 +26,8 @@ def parse_args():
     parser.add_argument('-tm', '--training-mode', metavar='TM', type=str,
                         default=config.HYPERPARAMETERS['training_mode'], help='2D or 2.5D training...',
                         dest='training_mode')
+    parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?',
+                        default=config.HYPERPARAMETERS['batch_size'], help='Batch size', dest='batch_size')
     args = parser.parse_args()
 
     assert args.dataset is not None
@@ -35,7 +37,7 @@ def parse_args():
     return args
 
 
-def evaluate(model, device, dataset, metrics_path, training_mode):
+def evaluate(model, device, dataset, metrics_path, training_mode, batch_size):
     for apply_morphological in [True, False]:
         if not apply_morphological:
             for apply_masking in [True, False]:
@@ -45,7 +47,7 @@ def evaluate(model, device, dataset, metrics_path, training_mode):
                 liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
                 lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
                 evaluator = Evaluator(dataset, model, device, liver_metrics, lesion_metrics,
-                                      apply_masking, apply_morphological, 0, 0, training_mode)
+                                      apply_masking, apply_morphological, 0, 0, training_mode, batch_size)
                 evaluator.evaluate()
                 write_metrics(metrics_path, f'Liver {setting}', liver_metrics)
                 write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
@@ -62,7 +64,7 @@ def evaluate(model, device, dataset, metrics_path, training_mode):
                         lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
                         evaluator = Evaluator(dataset, model, device, liver_metrics, lesion_metrics,
                                               apply_masking, apply_morphological, liver_kernel, tumor_kernel,
-                                              training_mode)
+                                              training_mode, batch_size)
                         evaluator.evaluate()
                         write_metrics(metrics_path, f'Liver {setting}', liver_metrics)
                         write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
@@ -75,4 +77,4 @@ if __name__ == "__main__":
     model.to(device)
 
     metrics_path = os.path.join(args.save_prefix, 'metrics.log')
-    evaluate(model, device, args.dataset, metrics_path, args.training_mode)
+    evaluate(model, device, args.dataset, metrics_path, args.training_mode, args.batch_size)
