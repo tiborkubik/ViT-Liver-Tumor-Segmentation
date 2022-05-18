@@ -36,6 +36,7 @@ class Evaluator:
         self.apply_morphological = apply_morphological
         self.kernel_liver = kernel_liver
         self.kernel_tumor = kernel_tumor
+        self.training_mode = training_mode
 
     def evaluate(self, volumes=None):
         if volumes is None:
@@ -85,7 +86,10 @@ class Evaluator:
         masks = sample['masks'].type(torch.FloatTensor).to(self.device)
         vol_idx = sample['vol_idx']
         # Add batch and channel dimension
-        inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
+        if self.training_mode == '2D':
+            inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
+        else:
+            inputs_batch = inputs.unsqueeze(0)
         return inputs_batch, masks, vol_idx
 
     @staticmethod

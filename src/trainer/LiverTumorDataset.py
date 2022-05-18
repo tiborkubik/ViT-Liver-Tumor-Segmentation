@@ -161,6 +161,8 @@ class LiverTumorDataset(Dataset):
         for key in sample:
             if isinstance(sample[key], np.ndarray):
                 sample[key] = torch.from_numpy(sample[key])
+            elif isinstance(sample[key], list):
+                sample[key] = torch.tensor(sample[key])
 
         sample['masks'] = torch.concat([sample['masks_liver'], sample['masks_tumor']])
         sample['vol_idx'] = vol_idx
