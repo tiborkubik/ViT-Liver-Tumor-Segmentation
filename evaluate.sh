@@ -27,6 +27,7 @@ echo "All packages installed. $(date +"%T")"
 
 ID=4
 MODEL="AttentionUNet"
+export PYTHONPATH=$DATADIR
 python  "$DATADIR/src/evaluation/evaluate_all_possible_settings.py" -d "$DATADIR/data/dataset/val" -w "$DATADIR/$ID/trained-weights/$MODEL/best-weights.pt" -n $MODEL -sp "$DATADIR/$ID/" -tm 2.5D -b 100
 
 echo "Cleaning environment: $(date +"%T")"
