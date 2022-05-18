@@ -70,7 +70,7 @@ def evaluate(model, device, dataset, metrics_path, training_mode):
 
 if __name__ == "__main__":
     args = parse_args()
-    model = create_model(args.network_name, weights_path=args.weights, training_mode='2D')
+    model = create_model(args.network_name, weights_path=args.weights, training_mode=args.training_mode)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
