@@ -51,8 +51,8 @@ def evaluate(model, device, dataset, metrics_path, training_mode):
                 write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
         else:
             for apply_masking in [True, False]:
-                for l_kernel in range(1, 5) if apply_morphological else [None]:
-                    for t_kernel in range(1, 4) if apply_morphological else [None]:
+                for l_kernel in [1, 2, 4] if apply_morphological else [None]:
+                    for t_kernel in [1, 3] if apply_morphological else [None]:
                         liver_kernel = 2 ** l_kernel
                         tumor_kernel = 2 ** t_kernel
                         setting = f'liver_kernel: {liver_kernel}, tumor_kernel: {tumor_kernel}, ' \
