@@ -3,8 +3,8 @@ import os
 modes = ['2D', '2.5D']
 models = ['UNet', 'AttentionUNet', 'TransUNet']
 losses = ['MSE', 'BCE']
-weights_liver = ["1.0", "2.0"]
-options = [('-tm', modes), ('-n', models), ('-lo', losses), ('-wl', weights_liver)]
+weights_tumor = ["1.0", "2.0"]
+options = [('-tm', modes), ('-n', models), ('-lo', losses), ('-wt', weights_tumor)]
 
 non_acceptable_options = [('2.5D', 'TransUNet')]
 edit_options = []
@@ -35,12 +35,13 @@ if __name__ == "__main__":
     else:
         os.makedirs(configs_path)
 
-    all_configs = ['']
-    for key, values in options:
-        prev_configs = all_configs.copy()
-        all_configs = [f"{config} {key if key else ''} {value}" for value in values for config in
-                       prev_configs]
-    all_configs = map(edit, filter(is_acceptable, all_configs))
+    # all_configs = ['']
+    # for key, values in options:
+    #     prev_configs = all_configs.copy()
+    #     all_configs = [f"{config} {key if key else ''} {value}" for value in values for config in
+    #                    prev_configs]
+    # all_configs = map(edit, filter(is_acceptable, all_configs))
+    all_configs = ['-tm 2.5D -n UNet -lo MSE -wt 2.0', '-tm 2.5D -n AttentionUNet -lo MSE -wt 2.0', '-tm 2D -n TransUNet -lo MSE -wt 2.0']
     for index, config in enumerate(all_configs):
         with open(f'configs/config{index + 1}.txt', 'w') as f:
             f.write(config)

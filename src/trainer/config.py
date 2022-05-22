@@ -41,8 +41,8 @@ HYPERPARAMETERS = {
 '''Input and output dimension configuration.'''
 DIMENSIONS = {
     'original': 512,
-    'input_net': 128,
-    'output_net': 128
+    'input_net': 512,
+    'output_net': 512
 }
 
 '''Vit settings'''
