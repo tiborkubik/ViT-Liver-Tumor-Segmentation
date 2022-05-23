@@ -86,7 +86,7 @@ mkdir "$SCRATCHDIR/documentation"
 echo "All ready. Starting trainer: $(date +"%T")"
 BACKBONE="$DATADIR/backbones/imagenet21k_R50+ViT-B_16.npz"
 
-python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -sp $SCRATCHDIR -ev -vw $BACKBONE -b 32 $config
+python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -sp $SCRATCHDIR -ev -vw $BACKBONE $config
 
 echo "Cleaning environment: $(date +"%T")"
 conda deactivate

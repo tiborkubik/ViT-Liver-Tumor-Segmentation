@@ -41,7 +41,7 @@ if __name__ == "__main__":
     #     all_configs = [f"{config} {key if key else ''} {value}" for value in values for config in
     #                    prev_configs]
     # all_configs = map(edit, filter(is_acceptable, all_configs))
-    all_configs = ['-tm 2.5D -n UNet -lo MSE -wt 2.0', '-tm 2.5D -n AttentionUNet -lo MSE -wt 2.0', '-tm 2D -n TransUNet -lo MSE -wt 2.0']
+    all_configs = ['-tm 2.5D -n UNet -lo MSE -wt 2.0 -b 16', '-tm 2.5D -n AttentionUNet -lo MSE -wt 2.0 -b 16', '-tm 2D -n TransUNet -lo MSE -wt 2.0 -b 4']
     for index, config in enumerate(all_configs):
         with open(f'configs/config{index + 1}.txt', 'w') as f:
             f.write(config)

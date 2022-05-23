@@ -164,7 +164,7 @@ class LiverTumorDataset(Dataset):
                 sample[key] = torch.from_numpy(sample[key])
 
 
-        sample['masks'] = torch.stack([sample['masks_liver'], sample['masks_tumor']])
+        sample['masks'] = torch.concat([sample['masks_liver'], sample['masks_tumor']])
         sample['vol_idx'] = vol_idx
         del sample['masks_liver']
         del sample['masks_tumor']
