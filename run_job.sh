@@ -3,7 +3,6 @@
 #PBS -q gpu
 #PBS -l select=1:ngpus=1:gpu_cap=cuda75:cl_adan=True:mem=32gb:scratch_local=100gb
 #PBS -l walltime=24:00:00
-#PBS -J 1-20
 
 find_in_conda_env() {
 conda env list | grep "${@}" >/dev/null 2>/dev/null
@@ -11,10 +10,10 @@ conda env list | grep "${@}" >/dev/null 2>/dev/null
 
 # Clean up after exit
 #trap 'clean_scratch' EXIT
-
+EXPERIMENT_ID=3
 DATADIR=/storage/brno2/home/lakoc/ViT-Liver-Tumor-Segmentation
-config=$(<$DATADIR/configs/config"${PBS_ARRAY_INDEX}".txt)
-
+config=$(<$DATADIR/configs/config"${EXPERIMENT_ID}".txt)
+checkpoint="3/trained-weights/TransUNet/best-weights.pt"
 echo "$PBS_JOBID is running on node $(hostname -f) in a scratch directory $SCRATCHDIR with following config: $config. Time: $(date +"%T")"
 
 #Copy source codes
@@ -41,6 +40,11 @@ echo "Copying data from FE: $(date +"%T").."
 # Copy dataset
 cp -r "$DATADIR/data" "$SCRATCHDIR/data" || {
   echo >&2 "Couldnt copy dataset to scratchdir."
+  exit 2
+}
+
+cp -r "$DATADIR/$checkpoint" "$SCRATCHDIR" || {
+  echo >&2 "Couldnt copy weights."
   exit 2
 }
 
@@ -86,24 +90,24 @@ mkdir "$SCRATCHDIR/documentation"
 echo "All ready. Starting trainer: $(date +"%T")"
 BACKBONE="$DATADIR/backbones/imagenet21k_R50+ViT-B_16.npz"
 
-python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -sp $SCRATCHDIR -ev -vw $BACKBONE $config
+python3 "$SCRATCHDIR/src/trainer/train.py" -dt "$SCRATCHDIR/data/train" -dv "$SCRATCHDIR/data/val" -sp $SCRATCHDIR -ev -vw $BACKBONE $config -ch "$SCRATCHDIR/best-weights.pt"
 
 echo "Cleaning environment: $(date +"%T")"
 conda deactivate
 
 echo "Training done. Copying back to FE: $(date +"%T")"
-mkdir "$DATADIR/$PBS_ARRAY_INDEX"
+mkdir "$DATADIR/$EXPERIMENT_ID"
 # Copy data back to FE
-cp -r "$SCRATCHDIR/documentation" "$DATADIR/$PBS_ARRAY_INDEX" || {
+cp -r "$SCRATCHDIR/documentation" "$DATADIR/$EXPERIMENT_ID" || {
   echo >&2 "Couldnt copy documentation to datadir."
   exit 3
 }
-cp -r "$SCRATCHDIR/trained-weights" "$DATADIR/$PBS_ARRAY_INDEX" || {
+cp -r "$SCRATCHDIR/trained-weights" "$DATADIR/$EXPERIMENT_ID" || {
   echo >&2 "Couldnt copy weights to datadir."
   exit 3
 }
 
-cp -r "$SCRATCHDIR/metrics.log" "$DATADIR/$PBS_ARRAY_INDEX" || {
+cp -r "$SCRATCHDIR/metrics.log" "$DATADIR/$EXPERIMENT_ID" || {
   echo >&2 "Couldnt copy metrics log."
   exit 3
 }

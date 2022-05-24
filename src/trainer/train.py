@@ -80,6 +80,9 @@ def parse_args():
                         help='Pretrained vision transformer model weights')
     parser.add_argument('-ev', '--evaluate', action='store_true', dest='evaluate',
                         help='Whether to evaluate different postprocessing methods on val split after training.')
+    parser.add_argument('-ch', '--checkpoint', metavar='CH', type=str, dest='checkpoint',
+                        default="",
+                        help='Path to the pretrained model weights.')
     args = parser.parse_args()
 
     assert args.dataset_train is not None
@@ -96,7 +99,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = parse_args()
 
-    network = create_model(args.network_name, training_mode=args.training_mode, vit_weights_path=args.v_weights)
+    network = create_model(args.network_name, training_mode=args.training_mode, weights_path=args.checkpoint or None,
+                           vit_weights_path=args.v_weights)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     network.to(device)
