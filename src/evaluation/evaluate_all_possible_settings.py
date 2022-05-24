@@ -26,6 +26,9 @@ def parse_args():
     parser.add_argument('-tm', '--training-mode', metavar='TM', type=str,
                         default=config.HYPERPARAMETERS['training_mode'], help='2D or 2.5D training...',
                         dest='training_mode')
+    parser.add_argument('-vw', '--vit_weights', metavar='VW', type=str, dest='v_weights',
+                        default="",
+                        help='Pretrained vision transformer model weights')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?',
                         default=config.HYPERPARAMETERS['batch_size'], help='Batch size', dest='batch_size')
     args = parser.parse_args()
@@ -74,7 +77,8 @@ def evaluate(model, device, dataset, metrics_path, training_mode, batch_size):
 
 if __name__ == "__main__":
     args = parse_args()
-    model = create_model(args.network_name, weights_path=args.weights, training_mode=args.training_mode)
+    model = create_model(args.network_name, weights_path=args.weights, training_mode=args.training_mode,
+                         vit_weights_path=args.v_weights)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
