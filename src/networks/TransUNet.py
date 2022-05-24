@@ -33,13 +33,14 @@ class TransUNet(nn.Module):
 
     def __init__(self, vit_model,
                  n_classes, img_size, weights,
-                 vit_patches_size):
+                 vit_patches_size, device):
         super(TransUNet, self).__init__()
         config_vit = vit_seg.CONFIGS[vit_model]
         config_vit.n_classes = n_classes
         if vit_model.find('R50') != -1:
             config_vit.patches.grid = (int(img_size / vit_patches_size), int(img_size / vit_patches_size))
-        self.net = vit_seg.VisionTransformer(config_vit, img_size=img_size, num_classes=config_vit.n_classes).cuda()
+        self.net = vit_seg.VisionTransformer(config_vit, img_size=img_size, num_classes=config_vit.n_classes)#.cuda()
+        self.net.to(device)
         if weights:
             self.net.load_from(weights=np.load(weights))
 
@@ -51,7 +52,7 @@ if __name__ == '__main__':
     network = TransUNet(vit_model='R50-ViT-B_16',
                         n_classes=3, img_size=224,
                         weights='models/vit_checkpoint/imagenet21k/imagenet21k_R50+ViT-B_16.npz',
-                        vit_patches_size=16).to('cuda:0')
+                        vit_patches_size=16, device='cuda:0').to('cuda:0')
 
     input_tensor = torch.rand(1, 1, 224, 224).to('cuda:0')
 

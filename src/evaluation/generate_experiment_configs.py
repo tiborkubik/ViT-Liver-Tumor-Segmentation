@@ -28,6 +28,16 @@ def edit(config):
     return config
 
 
+def get_configs():
+    all_configs = ['']
+    for key, values in options:
+        prev_configs = all_configs.copy()
+        all_configs = [f"{config} {key if key else ''} {value}" for value in values for config in
+                       prev_configs]
+    all_configs = map(edit, filter(is_acceptable, all_configs))
+    return list(all_configs)
+
+
 if __name__ == "__main__":
     if os.path.exists(configs_path):
         for file in os.listdir(configs_path):
@@ -35,13 +45,8 @@ if __name__ == "__main__":
     else:
         os.makedirs(configs_path)
 
-    # all_configs = ['']
-    # for key, values in options:
-    #     prev_configs = all_configs.copy()
-    #     all_configs = [f"{config} {key if key else ''} {value}" for value in values for config in
-    #                    prev_configs]
-    # all_configs = map(edit, filter(is_acceptable, all_configs))
-    all_configs = ['-tm 2.5D -n UNet -lo MSE -wt 2.0 -b 16', '-tm 2.5D -n AttentionUNet -lo MSE -wt 2.0 -b 16', '-tm 2D -n TransUNet -lo MSE -wt 2.0 -b 4']
+    all_configs = get_configs()
+    # all_configs = ['-tm 2.5D -n UNet -lo MSE -wt 2.0 -b 16', '-tm 2.5D -n AttentionUNet -lo MSE -wt 2.0 -b 16', '-tm 2D -n TransUNet -lo MSE -wt 2.0 -b 4']
     for index, config in enumerate(all_configs):
         with open(f'configs/config{index + 1}.txt', 'w') as f:
             f.write(config)

@@ -1,19 +1,20 @@
 import argparse
-import os
-import nibabel as nib
-import logging
-import numpy as np
-import zipfile
 import glob
-import cv2
-import torch
-
-from tqdm import tqdm
-from src.trainer import config
+import logging
+import os
+import zipfile
 from typing import List, Tuple
+
+import cv2
+import nibabel as nib
+import numpy as np
+import torch
+from tqdm import tqdm
+
 from src.evaluation.metrics import ASSD, DicePerVolume, MSD, RAVD, VOE, VolumeMetric
 from src.evaluation.utils import write_metrics
 from src.networks.utils import create_model
+from src.trainer import config
 from src.trainer.LiverTumorDataset import get_dataset_loader, normalize_slice
 
 logging.basicConfig()
@@ -51,7 +52,7 @@ class Evaluator:
 
         with torch.no_grad():
             for i_batch, sample in enumerate(loop):
-                inputs, masks, vol_idx = self._prepare_sample(sample)
+                inputs, masks, vol_idx = prepare_sample(sample, self.training_mode, self.device)
 
                 predictions = self.model(inputs)
 
@@ -74,25 +75,12 @@ class Evaluator:
 
                 for prediction in range(self.batch_size):
                     pred_liver_np, pred_lesion_np = self.postprocess(preds_liver_np[prediction],
-                                                                       preds_lesion_np[prediction])
+                                                                     preds_lesion_np[prediction])
                     pred_liver = torch.from_numpy(pred_liver_np)
                     pred_lesion = torch.from_numpy(pred_lesion_np)
                     self._update_metrics(self.liver_metrics, pred_liver, masks_liver[prediction], vol_idx[prediction])
-                    self._update_metrics(self.lesion_metrics, pred_lesion, masks_lesion[prediction], vol_idx[prediction])
-
-    def _prepare_sample(self, sample):
-        inputs = sample['images'].type(torch.FloatTensor).to(self.device)
-        masks = sample['masks'].type(torch.FloatTensor).to(self.device)
-        vol_idx = sample['vol_idx']
-        # Add batch and channel dimension
-        if inputs.dim() != 4:
-            if self.training_mode == '2D':
-                inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
-            else:
-                inputs_batch = inputs.unsqueeze(0)
-        else:
-            inputs_batch = inputs
-        return inputs_batch, masks, vol_idx
+                    self._update_metrics(self.lesion_metrics, pred_lesion, masks_lesion[prediction],
+                                         vol_idx[prediction])
 
     @staticmethod
     def _reset_metrics(metrics):
@@ -212,6 +200,22 @@ class Evaluator:
                                    interpolation=cv2.INTER_AREA)
         normalized_slice = normalize_slice(resized_slice)
         return normalized_slice
+
+
+def prepare_sample(sample, training_mode, device):
+    inputs = sample['images'].type(torch.FloatTensor).to(device)
+    masks = sample['masks'].type(torch.FloatTensor).to(device)
+    vol_idx = sample['vol_idx']
+    # Add batch and channel dimension
+    if inputs.dim() != 4:
+        inputs = inputs.squeeze()
+        if training_mode == '2D':
+            inputs_batch = inputs.unsqueeze(0).unsqueeze_(0)
+        else:
+            inputs_batch = inputs.unsqueeze(0)
+    else:
+        inputs_batch = inputs
+    return inputs_batch, masks, vol_idx
 
 
 def parse_args():
