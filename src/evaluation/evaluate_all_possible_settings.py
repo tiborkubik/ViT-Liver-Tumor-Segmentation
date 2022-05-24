@@ -37,37 +37,39 @@ def parse_args():
     return args
 
 
+def evaluate_single_run(liver_kernel, tumor_kernel, apply_morphological, apply_masking, dataset, training_mode,
+                        batch_size, model, device, metrics_path):
+    setting = f'liver_kernel: {liver_kernel}, tumor_kernel: {tumor_kernel}, ' \
+              f'apply_morphological: {apply_morphological}, apply_masking: {apply_masking}'
+    logging.debug(setting)
+    liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
+    lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
+    evaluator = Evaluator(dataset, model, device, liver_metrics, lesion_metrics,
+                          apply_masking, apply_morphological, liver_kernel, tumor_kernel,
+                          training_mode, batch_size)
+    evaluator.evaluate()
+    write_metrics(metrics_path, f'Liver {setting}', liver_metrics)
+    write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
+
+
 def evaluate(model, device, dataset, metrics_path, training_mode, batch_size):
     for apply_morphological in [True, False]:
         if not apply_morphological:
             for apply_masking in [True, False]:
-                setting = f'liver_kernel: 0, tumor_kernel: 0, ' \
-                          f'apply_morphological: {apply_morphological}, apply_masking: {apply_masking}'
-                logging.debug(setting)
-                liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-                lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-                evaluator = Evaluator(dataset, model, device, liver_metrics, lesion_metrics,
-                                      apply_masking, apply_morphological, 0, 0, training_mode, batch_size)
-                evaluator.evaluate()
-                write_metrics(metrics_path, f'Liver {setting}', liver_metrics)
-                write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
+                evaluate_single_run(0, 0, apply_morphological, apply_masking, dataset, training_mode, batch_size, model,
+                                    device, metrics_path)
         else:
             for apply_masking in [True, False]:
                 for l_kernel in [1, 2, 4] if apply_morphological else [None]:
-                    for t_kernel in [1, 3] if apply_morphological else [None]:
-                        liver_kernel = 2 ** l_kernel
-                        tumor_kernel = 2 ** t_kernel
-                        setting = f'liver_kernel: {liver_kernel}, tumor_kernel: {tumor_kernel}, ' \
-                                  f'apply_morphological: {apply_morphological}, apply_masking: {apply_masking}'
-                        logging.debug(setting)
-                        liver_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-                        lesion_metrics = [DicePerVolume(), VOE(), RAVD(), ASSD(), MSD()]
-                        evaluator = Evaluator(dataset, model, device, liver_metrics, lesion_metrics,
-                                              apply_masking, apply_morphological, liver_kernel, tumor_kernel,
-                                              training_mode, batch_size)
-                        evaluator.evaluate()
-                        write_metrics(metrics_path, f'Liver {setting}', liver_metrics)
-                        write_metrics(metrics_path, f'Lesion {setting}', lesion_metrics)
+                    liver_kernel = 2 ** l_kernel
+                    tumor_kernel = 0
+                    evaluate_single_run(liver_kernel, tumor_kernel, apply_morphological, apply_masking, dataset,
+                                        training_mode, batch_size, model, device, metrics_path)
+                for t_kernel in [1, 2, 3] if apply_morphological else [None]:
+                    liver_kernel = 0
+                    tumor_kernel = 2 ** t_kernel
+                    evaluate_single_run(liver_kernel, tumor_kernel, apply_morphological, apply_masking, dataset,
+                                        training_mode, batch_size, model, device, metrics_path)
 
 
 if __name__ == "__main__":

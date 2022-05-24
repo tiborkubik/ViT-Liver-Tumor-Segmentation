@@ -129,7 +129,7 @@ if __name__ == '__main__':
         trainer.training()
         if args.evaluate:
             metrics_path = os.path.join(args.s_prefix, 'metrics.log')
-            evaluate(network, device, args.dataset_val, metrics_path)
+            evaluate(network, device, args.dataset_val, metrics_path, args.training_mode, args.batch_size)
 
     except KeyboardInterrupt:
         torch.save(network.state_dict(), os.path.join(args.s_prefix, 'interrupted_model.pt'))
