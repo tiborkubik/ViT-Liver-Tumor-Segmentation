@@ -25,8 +25,8 @@ echo "ENV created. $(date +"%T") Installing requirements ..."
 pip install -r "$DATADIR/requirements.txt"
 echo "All packages installed. $(date +"%T")"
 
-ID=4
-MODEL="AttentionUNet"
+ID=3
+MODEL="TransUNet"
 
 cp -r "$DATADIR/src" "$SCRATCHDIR/src" || {
   echo >&2 "Couldnt copy srcdir to scratchdir."
@@ -43,8 +43,9 @@ cp -r "$DATADIR/$ID/trained-weights/$MODEL/best-weights.pt" "$SCRATCHDIR" || {
   exit 2
 }
 
+BACKBONE="$DATADIR/backbones/imagenet21k_R50+ViT-B_16.npz"
 export PYTHONPATH=$DATADIR
-python  "$SCRATCHDIR/src/evaluation/evaluate_all_possible_settings.py" -d "$SCRATCHDIR/dataset" -w "$SCRATCHDIR/best-weights.pt" -n $MODEL -sp $SCRATCHDIR -tm 2.5D -b 100
+python  "$SCRATCHDIR/src/evaluation/evaluate_all_possible_settings.py" -d "$SCRATCHDIR/data/val" -vw $BACKBONE -w "$SCRATCHDIR/best-weights.pt" -n $MODEL -sp $SCRATCHDIR -tm 2D -b 100
 
 cp -r "$SCRATCHDIR/metrics.log" "$DATADIR/$ID" || {
   echo >&2 "Couldnt copy metrics log."
