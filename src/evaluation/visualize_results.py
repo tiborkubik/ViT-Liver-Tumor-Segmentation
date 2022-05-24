@@ -1,4 +1,5 @@
 import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -36,10 +37,13 @@ def parse_experiments(experiments):
     return parsed_e
 
 
-def get_kernel_stats(run, kernels, type):
-    per_kernel_dice = {setting['setting']['liver_kernel']: setting['Dice'] for setting in run if
-                       setting['setting']['liver_kernel'] in kernels and setting['setting'][
-                           'apply_masking'] == 'False' and setting['type'] == type}
+def get_kernel_stats(run, kernels, type, metric):
+    per_kernel_dice = {}
+    for setting in run:
+        if setting['setting']['liver_kernel'] in kernels and \
+                setting['setting']['apply_masking'] == 'False' and \
+                setting['type'] == type:
+            per_kernel_dice[setting['setting']['liver_kernel']] = setting[metric]
     return np.array([per_kernel_dice[kernel] for kernel in kernels])
 
 
@@ -57,28 +61,33 @@ def find_indices(lst, condition):
     return [i for i, elem in enumerate(lst) if condition(elem)]
 
 
-def print_result(dice_scores, configs, name,condition):
-    print(f"{name}: {np.max(dice_scores[find_indices(configs, condition), :])}")
+def print_result(func, dice_scores, configs, name, condition):
+    print(f"{name}: {func(dice_scores[find_indices(configs, condition), :])}")
 
 
-def print_best_results(dice_scores, configs):
-    print_result(dice_scores, configs, 'UNet 2D', lambda x: '2D' in x and ' UNet' in x)
-    print_result(dice_scores, configs, 'UNet 2.5D', lambda x: '2.5D' in x and ' UNet' in x)
-    print_result(dice_scores, configs, 'AttentionUNet 2D', lambda x: '2D' in x and 'AttentionUNet' in x)
-    print_result(dice_scores, configs, 'AttentionUNet 2.5D', lambda x: '2.5D' in x and 'AttentionUNet' in x)
-    print_result(dice_scores, configs, 'TransUNet 2D', lambda x: '2D' in x and 'TransUNet' in x)
+def print_best_results(func, dice_scores, configs):
+    print_result(func, dice_scores, configs, 'UNet 2D', lambda x: '2D' in x and ' UNet' in x)
+    print_result(func, dice_scores, configs, 'UNet 2.5D', lambda x: '2.5D' in x and ' UNet' in x)
+    print_result(func, dice_scores, configs, 'AttentionUNet 2D', lambda x: '2D' in x and 'AttentionUNet' in x)
+    print_result(func, dice_scores, configs, 'AttentionUNet 2.5D', lambda x: '2.5D' in x and 'AttentionUNet' in x)
+    print_result(func, dice_scores, configs, 'TransUNet 2D', lambda x: '2D' in x and 'TransUNet' in x)
 
+def get_scores(runs, liver_kernels, lesion_kernels, metric: str):
+    scores_liver = []
+    scores_tumor = []
+    for run in runs:
+        scores_liver.append(get_kernel_stats(run, liver_kernels, 'Liver', metric))
+        scores_tumor.append(get_kernel_stats(run, lesion_kernels, 'Lesion', metric))
+    scores_liver = np.stack(scores_liver)
+    scores_tumor = np.stack(scores_tumor)
+    return scores_liver, scores_tumor
 
 def visualize_results(runs, configs):
     liver_kernels = ['0', '2', '4', '16']
     lesion_kernels = ['0', '2', '4']
-    dice_scores_liver = []
-    dice_scores_tumor = []
-    for run in runs:
-        dice_scores_liver.append(get_kernel_stats(run, liver_kernels, 'Liver'))
-        dice_scores_tumor.append(get_kernel_stats(run, lesion_kernels, 'Lesion'))
-    dice_scores_liver = np.stack(dice_scores_liver)
-    dice_scores_tumor = np.stack(dice_scores_tumor)
+
+    dice_scores_liver, dice_scores_tumor = get_scores(runs, liver_kernels, lesion_kernels, 'Dice')
+
     liver_detected = np.all(dice_scores_liver > 0, axis=1)
     tumor_detected = np.all(dice_scores_tumor > 0, axis=1)
     dice_scores_liver = dice_scores_liver[liver_detected, :]
@@ -117,10 +126,19 @@ def visualize_results(runs, configs):
     ax.set_xticks(range(1, 3), ['Disabled', "Enabled"])
     fig.savefig('documentation/masking.pdf')
 
-    print('Liver')
-    print_best_results(dice_scores_liver, [config for index, config in enumerate(configs) if liver_detected[index]])
-    print('Tumor')
-    print_best_results(dice_scores_tumor, [config for index, config in enumerate(configs) if tumor_detected[index]])
+    configs_with_detected_liver = [config for index, config in enumerate(configs) if liver_detected[index]]
+    configs_with_detected_tumor = [config for index, config in enumerate(configs) if tumor_detected[index]]
+    for metric, func in [('Dice', np.max), ('VOE', np.min), ('MSD', np.min), ('ASSD', np.min)]:
+        print("================================================")
+        print(metric)
+        scores_liver, scores_tumor = get_scores(runs, liver_kernels, lesion_kernels, metric)
+        scores_liver = scores_liver[liver_detected, :]
+        scores_tumor = scores_tumor[tumor_detected, :]
+
+        print('Liver')
+        print_best_results(func, scores_liver, configs_with_detected_liver)
+        print('Tumor')
+        print_best_results(func, scores_tumor, configs_with_detected_tumor)
 
 
 if __name__ == '__main__':
@@ -130,7 +148,7 @@ if __name__ == '__main__':
     for index, config in enumerate(configs):
         with open(os.path.join('configs', config)) as f:
             configs_loaded.append(f.read())
-            with open(os.path.join('experiments', str(index + 1), 'metrics.log')) as fr:
+            with open(os.path.join('trained_weights', str(index + 1), 'metrics.log')) as fr:
                 results.append(parse_experiments(fr.read()))
     visualize_results(results, configs_loaded)
     x = 2
